@@ -1,7 +1,8 @@
 fastapi
 uvicorn[standard]
 sqlalchemy
-python-multipart
-python-jose[cryptography]
 pydantic
 requests
+kavenegar
+pymysql
+python-jose[cryptography]

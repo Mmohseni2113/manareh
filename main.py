@@ -1,24 +1,38 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, text, inspect, Boolean, func
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
-from sqlalchemy.sql import func
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
-from fastapi.middleware.cors import CORSMiddleware
 import re
 import hashlib
 import base64
+import os
+
+# ایجاد اپلیکیشن
+app = FastAPI()
+
+# mount استاتیک
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# صفحه اصلی
+@app.get("/")
+def home():
+    return FileResponse("static/index.html")
+
 
 # تست اتصال به دیتابیس
 def test_database_connection():
     try:
         database_urls = [
-            "SQLALCHEMY_DATABASE_URL = "postgresql+psycopg2://manareh_user:n1H3x7HqqpwUMnJKN7EJkuhGCf4Dp2yD@dpg-xxxxx.render.com:5432/manareh",
-            "mysql+pymysql://manareh_user:n1H3x7HqqpwUMnJKN7EJkuhGCf4Dp2yD@dpg-xxxxx.render.com/manareh",
+            "mysql+pymysql://M.mohseni:123m456o789h@127.0.0.1/manareh",
+            "mysql+pymysql://M.mohseni:123m456o789h@localhost/manareh",
         ]
         
         for db_url in database_urls:
@@ -436,7 +450,7 @@ def get_optional_current_user(token: str = Depends(oauth2_scheme), db: Session =
         return None
 
 # اپلیکیشن FastAPI
-app = FastAPI(title="Manareh API", description="پلتفرم مراسمات مناره", version="1.0.0")
+#app = FastAPI(title="Manareh API", description="پلتفرم مراسمات مناره", version="1.0.0")
 
 # تنظیمات CORS
 app.add_middleware(
@@ -1337,6 +1351,104 @@ async def register_for_event(event_id: int, current_user: User = Depends(get_cur
         print(f"❌ خطا در ثبت‌نام: {e}")
         raise HTTPException(status_code=500, detail="خطای سرور در ثبت‌نام")
 
+# اضافه کردن endpoint جدید برای حذف ثبت‌نام از رویداد
+@app.delete("/events/{event_id}/unregister")
+async def unregister_from_event(event_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        print(f"🗑️ حذف ثبت‌نام کاربر {current_user.id} از رویداد {event_id}")
+        
+        event = db.query(Event).filter(Event.id == event_id).first()
+        if not event:
+            raise HTTPException(status_code=404, detail="رویداد یافت نشد")
+        
+        registration = db.query(EventParticipant).filter(
+            EventParticipant.event_id == event_id,
+            EventParticipant.user_id == current_user.id
+        ).first()
+        
+        if not registration:
+            raise HTTPException(status_code=404, detail="شما در این رویداد ثبت‌نام نکرده‌اید")
+        
+        db.delete(registration)
+        db.commit()
+        
+        # ایجاد نوتیفیکیشن
+        notification = Notification(
+            user_id=current_user.id,
+            title="لغو ثبت‌نام",
+            message=f"ثبت‌نام شما در رویداد '{event.title}' لغو شد.",
+            type="info"
+        )
+        db.add(notification)
+        db.commit()
+        
+        print(f"✅ ثبت‌نام با موفقیت حذف شد")
+        return {"message": "ثبت‌نام شما با موفقیت حذف شد"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ خطا در حذف ثبت‌نام: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در حذف ثبت‌نام")
+
+# اضافه کردن endpoint جدید برای دریافت رویدادهای ثبت‌نام شده کاربر
+@app.get("/users/{user_id}/registered-events")
+async def get_user_registered_events(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        print(f"📋 دریافت رویدادهای ثبت‌نام شده کاربر {user_id}")
+        
+        if current_user.id != user_id:
+            raise HTTPException(status_code=403, detail="دسترسی غیرمجاز")
+        
+        registrations = db.query(EventParticipant).filter(EventParticipant.user_id == user_id).all()
+        event_ids = [reg.event_id for reg in registrations]
+        
+        events = db.query(Event).filter(Event.id.in_(event_ids)).all()
+        
+        events_list = []
+        for event in events:
+            avg_rating_result = db.query(func.avg(Comment.rating)).filter(Comment.event_id == event.id).scalar()
+            average_rating = round(float(avg_rating_result or 0), 1)
+            
+            comment_count = db.query(Comment).filter(Comment.event_id == event.id).count()
+            
+            current_participants = db.query(EventParticipant).filter(EventParticipant.event_id == event.id).count()
+            
+            # بررسی آیا کاربر در این رویداد ثبت‌نام کرده است
+            user_registered = True
+            
+            event_dict = {
+                "id": event.id,
+                "title": event.title,
+                "time": event.time,
+                "location": event.location,
+                "latitude": event.latitude,
+                "longitude": event.longitude,
+                "host": event.host,
+                "creator": event.creator,
+                "created_at": event.created_at,
+                "type": getattr(event, 'type', 'religious'),
+                "city": getattr(event, 'city', 'تهران'),
+                "province": getattr(event, 'province', 'تهران'),
+                "country": getattr(event, 'country', 'iran'),
+                "capacity": getattr(event, 'capacity', 100),
+                "active": getattr(event, 'active', 1),
+                "is_free": getattr(event, 'is_free', True),
+                "price": getattr(event, 'price', 0.0),
+                "average_rating": average_rating,
+                "comment_count": comment_count,
+                "current_participants": current_participants,
+                "user_registered": user_registered,
+                "registration_id": next((reg.id for reg in registrations if reg.event_id == event.id), None)
+            }
+            events_list.append(event_dict)
+        
+        return events_list
+    except Exception as e:
+        print(f"خطا در دریافت رویدادهای ثبت‌نام شده: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادهای ثبت‌نام شده")
+
 @app.get("/events/{event_id}/participants", response_model=List[EventParticipantResponse])
 async def get_event_participants(event_id: int, db: Session = Depends(get_db)):
     try:
@@ -1654,13 +1766,6 @@ async def geocode_address(lat: float, lng: float):
 async def options_route(path: str):
     return JSONResponse(content={"status": "ok"})
 
-@app.get("/")
-async def root():
-    return {
-        "message": "خوش آمدید به پلتفرم مناره",
-        "version": "1.0.0",
-        "status": "فعال"
-    }
 
 @app.get("/test-db")
 async def test_db(db: Session = Depends(get_db)):
@@ -1819,6 +1924,3 @@ if __name__ == "__main__":
     print("🚀 شروع سرویس Manareh API...")
     print(f"🎯 اتصال دیتابیس: {DATABASE_URL}")
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
-    from fastapi.staticfiles import StaticFiles
-
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
