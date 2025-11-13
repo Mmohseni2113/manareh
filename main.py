@@ -1,0 +1,1824 @@
+from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.responses import JSONResponse
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, text, inspect, Boolean, func
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from sqlalchemy.sql import func
+from jose import JWTError, jwt
+from datetime import datetime, timedelta
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+import re
+import hashlib
+import base64
+
+# تست اتصال به دیتابیس
+def test_database_connection():
+    try:
+        database_urls = [
+            "SQLALCHEMY_DATABASE_URL = "postgresql+psycopg2://manareh_user:n1H3x7HqqpwUMnJKN7EJkuhGCf4Dp2yD@dpg-xxxxx.render.com:5432/manareh",
+            "mysql+pymysql://manareh_user:n1H3x7HqqpwUMnJKN7EJkuhGCf4Dp2yD@dpg-xxxxx.render.com/manareh",
+        ]
+        
+        for db_url in database_urls:
+            try:
+                print(f"🔧 تست اتصال به: {db_url}")
+                engine = create_engine(db_url)
+                with engine.connect() as conn:
+                    result = conn.execute(text("SELECT 1"))
+                    print(f"✅ اتصال موفق به: {db_url}")
+                    return db_url
+            except Exception as e:
+                print(f"❌ خطا در اتصال به {db_url}: {e}")
+                continue
+        
+        print("❌ هیچ یک از اتصالات کار نکرد")
+        return None
+        
+    except Exception as e:
+        print(f"❌ خطا در تست اتصال: {e}")
+        return None
+
+# پیدا کردن اتصال درست
+DATABASE_URL = test_database_connection()
+
+if not DATABASE_URL:
+    DATABASE_URL = "sqlite:///./manareh.db"
+    print("🔧 استفاده از SQLite به عنوان fallback")
+
+print(f"🎯 اتصال نهایی: {DATABASE_URL}")
+
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# تنظیمات JWT
+SECRET_KEY = "manareh-secret-key-2024-very-secure-key-here"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# مدل‌های دیتابیس
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    first_name = Column(String(50), nullable=False)
+    last_name = Column(String(50), nullable=False)
+    email = Column(String(100), unique=True, nullable=False)
+    national_id = Column(String(10), unique=True, nullable=False)
+    phone_number = Column(String(11), nullable=False)
+    country = Column(String(50), nullable=False)
+    province = Column(String(50), nullable=False)
+    city = Column(String(50), nullable=False)
+    gender = Column(String(10), nullable=False)
+    password = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Event(Base):
+    __tablename__ = "events"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    title = Column(String(100), nullable=False)
+    time = Column(DateTime, nullable=False)
+    location = Column(String(255), nullable=False)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    host = Column(String(100), nullable=False)
+    creator = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    type = Column(String(20), default="religious")
+    city = Column(String(50), default="تهران")
+    province = Column(String(50), default="تهران")
+    country = Column(String(50), default="iran")
+    capacity = Column(Integer, default=100)
+    active = Column(Integer, default=1)
+    is_free = Column(Boolean, default=True)
+    price = Column(Float, default=0.0)
+
+class Comment(Base):
+    __tablename__ = "comments"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    comment = Column(String(500), nullable=False)
+    rating = Column(Integer, default=5)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class EventParticipant(Base):
+    __tablename__ = "event_participants"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    registered_at = Column(DateTime, default=datetime.utcnow)
+    attended = Column(Boolean, default=False)
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String(200), nullable=False)
+    message = Column(String(500), nullable=False)
+    type = Column(String(50), default="info")
+    read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class UserFavorite(Base):
+    __tablename__ = "user_favorites"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# تابع برای بررسی و ایجاد فیلدهای جدید
+def check_and_create_missing_columns():
+    """بررسی و ایجاد فیلدهای جدید در جداول"""
+    db = SessionLocal()
+    try:
+        inspector = inspect(engine)
+        
+        # بررسی فیلدهای events
+        events_columns = [col['name'] for col in inspector.get_columns('events')]
+        missing_columns = []
+        
+        expected_columns = ['type', 'city', 'province', 'country', 'capacity', 'active', 'is_free', 'price']
+        for col in expected_columns:
+            if col not in events_columns:
+                missing_columns.append(col)
+        
+        if missing_columns:
+            print(f"🔧 ایجاد فیلدهای جدید: {missing_columns}")
+            
+            for col in missing_columns:
+                if col == 'type':
+                    db.execute(text("ALTER TABLE events ADD COLUMN type VARCHAR(20) DEFAULT 'religious'"))
+                elif col == 'city':
+                    db.execute(text("ALTER TABLE events ADD COLUMN city VARCHAR(50) DEFAULT 'تهران'"))
+                elif col == 'province':
+                    db.execute(text("ALTER TABLE events ADD COLUMN province VARCHAR(50) DEFAULT 'تهران'"))
+                elif col == 'country':
+                    db.execute(text("ALTER TABLE events ADD COLUMN country VARCHAR(50) DEFAULT 'iran'"))
+                elif col == 'capacity':
+                    db.execute(text("ALTER TABLE events ADD COLUMN capacity INT DEFAULT 100"))
+                elif col == 'active':
+                    db.execute(text("ALTER TABLE events ADD COLUMN active TINYINT DEFAULT 1"))
+                elif col == 'is_free':
+                    db.execute(text("ALTER TABLE events ADD COLUMN is_free TINYINT DEFAULT 1"))
+                elif col == 'price':
+                    db.execute(text("ALTER TABLE events ADD COLUMN price FLOAT DEFAULT 0.0"))
+            
+            db.commit()
+            print("✅ فیلدهای جدید ایجاد شدند")
+        
+        # بررسی وجود جدول comments
+        if 'comments' not in inspector.get_table_names():
+            print("🔧 ایجاد جدول comments")
+            Base.metadata.tables['comments'].create(bind=engine)
+            print("✅ جدول comments ایجاد شد")
+        
+        # بررسی وجود جدول event_participants
+        if 'event_participants' not in inspector.get_table_names():
+            print("🔧 ایجاد جدول event_participants")
+            Base.metadata.tables['event_participants'].create(bind=engine)
+            print("✅ جدول event_participants ایجاد شد")
+        
+        # بررسی وجود جدول notifications
+        if 'notifications' not in inspector.get_table_names():
+            print("🔧 ایجاد جدول notifications")
+            Base.metadata.tables['notifications'].create(bind=engine)
+            print("✅ جدول notifications ایجاد شد")
+        
+        # بررسی وجود جدول user_favorites
+        if 'user_favorites' not in inspector.get_table_names():
+            print("🔧 ایجاد جدول user_favorites")
+            Base.metadata.tables['user_favorites'].create(bind=engine)
+            print("✅ جدول user_favorites ایجاد شد")
+        
+        # بررسی فیلد rating در comments
+        comments_columns = [col['name'] for col in inspector.get_columns('comments')]
+        if 'rating' not in comments_columns:
+            print("🔧 ایجاد فیلد rating در comments")
+            db.execute(text("ALTER TABLE comments ADD COLUMN rating INT DEFAULT 5"))
+            db.commit()
+            print("✅ فیلد rating ایجاد شد")
+            
+    except Exception as e:
+        print(f"❌ خطا در ایجاد فیلدها: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+# ایجاد جداول در دیتابیس
+try:
+    Base.metadata.create_all(bind=engine)
+    print("✅ جداول دیتابیس ایجاد شدند")
+    
+    # بررسی و ایجاد فیلدهای جدید
+    check_and_create_missing_columns()
+    
+except Exception as e:
+    print(f"❌ خطا در ایجاد جداول: {e}")
+
+# مدل‌های Pydantic
+class RepeatPattern(BaseModel):
+    type: str
+    interval: int = 1
+    days: Optional[List[int]] = None
+    day_of_month: Optional[int] = None
+    end_date: Optional[datetime] = None
+    occurrences: Optional[int] = None
+
+class UserCreate(BaseModel):
+    first_name: str
+    last_name: str
+    email: str
+    national_id: str
+    phone_number: str
+    country: str
+    province: str
+    city: str
+    gender: str
+    password: str
+
+class UserResponse(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    email: str
+    national_id: str
+    phone_number: str
+    country: str
+    province: str
+    city: str
+    gender: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class EventCreate(BaseModel):
+    title: str
+    time: datetime
+    location: str
+    latitude: float
+    longitude: float
+    host: str
+    creator: int
+    type: Optional[str] = "religious"
+    city: Optional[str] = None
+    province: Optional[str] = None
+    country: Optional[str] = "iran"
+    capacity: Optional[int] = 100
+    is_free: Optional[bool] = True
+    price: Optional[float] = 0.0
+    repeat_pattern: Optional[RepeatPattern] = None
+
+class EventResponse(BaseModel):
+    id: int
+    title: str
+    time: datetime
+    location: str
+    latitude: float
+    longitude: float
+    host: str
+    creator: int
+    created_at: datetime
+    type: Optional[str] = "religious"
+    city: Optional[str] = None
+    province: Optional[str] = None
+    country: Optional[str] = "iran"
+    capacity: Optional[int] = 100
+    active: Optional[int] = 1
+    is_free: Optional[bool] = True
+    price: Optional[float] = 0.0
+    average_rating: Optional[float] = 0.0
+    comment_count: Optional[int] = 0
+    current_participants: Optional[int] = 0
+    is_favorite: Optional[bool] = False
+
+    class Config:
+        from_attributes = True
+
+class CommentCreate(BaseModel):
+    event_id: int
+    user_id: int
+    comment: str
+    rating: Optional[int] = 5
+
+class CommentResponse(BaseModel):
+    id: int
+    event_id: int
+    user_id: int
+    comment: str
+    rating: int
+    created_at: datetime
+    user_name: str
+
+    class Config:
+        from_attributes = True
+
+class EventParticipantCreate(BaseModel):
+    event_id: int
+    user_id: int
+
+class EventParticipantResponse(BaseModel):
+    id: int
+    event_id: int
+    user_id: int
+    registered_at: datetime
+    attended: bool
+    user_name: str
+
+    class Config:
+        from_attributes = True
+
+class NotificationCreate(BaseModel):
+    user_id: int
+    title: str
+    message: str
+    type: Optional[str] = "info"
+
+class NotificationResponse(BaseModel):
+    id: int
+    user_id: int
+    title: str
+    message: str
+    type: str
+    read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user_id: int
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class UserStatsResponse(BaseModel):
+    events_count: int
+    notifications_count: int
+    favorites_count: int
+    join_year: int
+
+class FavoriteCreate(BaseModel):
+    user_id: int
+    event_id: int
+
+class FavoriteResponse(BaseModel):
+    id: int
+    user_id: int
+    event_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# توابع کمکی برای هش کردن رمز عبور
+def get_password_hash(password: str) -> str:
+    """هش ساده رمز عبور با SHA-256 + salt"""
+    salt = "manareh-salt-2024"
+    password_bytes = (password + salt).encode('utf-8')
+    hash_bytes = hashlib.sha256(password_bytes).digest()
+    return base64.b64encode(hash_bytes).decode('utf-8')
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """بررسی تطابق رمز عبور"""
+    return get_password_hash(plain_password) == hashed_password
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# توابع کمکی
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        # اگر توکن خالی است، خطا نده و None برگردان
+        if not token or token == "null" or token == "undefined":
+            return None
+            
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+            
+        user = db.query(User).filter(User.email == email).first()
+        if user is None:
+            raise credentials_exception
+        return user
+    except JWTError:
+        raise credentials_exception
+
+# اضافه کردن dependency اختیاری برای کاربر جاری
+def get_optional_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    try:
+        return get_current_user(token, db)
+    except HTTPException:
+        return None
+
+# اپلیکیشن FastAPI
+app = FastAPI(title="Manareh API", description="پلتفرم مراسمات مناره", version="1.0.0")
+
+# تنظیمات CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/debug-db")
+async def debug_db():
+    """endpoint برای دیباگ کامل دیتابیس"""
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT 1"))
+            db_test = "✅ اتصال به دیتابیس موفق"
+            
+            if "sqlite" in DATABASE_URL:
+                tables_result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
+            else:
+                tables_result = conn.execute(text("SHOW TABLES"))
+            
+            tables = [row[0] for row in tables_result]
+            
+            events_columns_result = conn.execute(text("DESCRIBE events"))
+            events_columns = [row[0] for row in events_columns_result]
+            
+            return {
+                "status": "success",
+                "database_url": DATABASE_URL,
+                "connection_test": db_test,
+                "tables": tables,
+                "events_columns": events_columns,
+                "database_type": "SQLite" if "sqlite" in DATABASE_URL else "MySQL"
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "database_url": DATABASE_URL,
+            "error": str(e),
+            "suggestion": "مشکل در اتصال به دیتابیس. لطفاً مطمئن شوید MySQL در حال اجراست."
+        }
+
+@app.get("/check-user")
+async def check_user_exists(
+    email: str = Query(None),
+    national_id: str = Query(None),
+    phone: str = Query(None),
+    db: Session = Depends(get_db)
+):
+    try:
+        exists = False
+        message = ""
+        
+        if email:
+            user_by_email = db.query(User).filter(User.email == email).first()
+            if user_by_email:
+                exists = True
+                message = "ایمیل قبلاً ثبت شده است"
+        
+        if national_id and not exists:
+            user_by_national = db.query(User).filter(User.national_id == national_id).first()
+            if user_by_national:
+                exists = True
+                message = "کد ملی قبلاً ثبت شده است"
+        
+        if phone and not exists:
+            user_by_phone = db.query(User).filter(User.phone_number == phone).first()
+            if user_by_phone:
+                exists = True
+                message = "شماره تلفن قبلاً ثبت شده است"
+        
+        return {"exists": exists, "message": message}
+    except Exception as e:
+        print(f"Error in check-user: {e}")
+        return {"exists": False, "message": "خطا در بررسی کاربر"}
+
+@app.get("/debug/users")
+async def debug_users(db: Session = Depends(get_db)):
+    """endpoint برای دیباگ کاربران"""
+    try:
+        users = db.query(User).all()
+        users_list = []
+        for user in users:
+            users_list.append({
+                "id": user.id,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "email": user.email,
+                "national_id": user.national_id,
+                "phone_number": user.phone_number,
+                "country": user.country,
+                "province": user.province,
+                "city": user.city,
+                "gender": user.gender,
+                "created_at": user.created_at.isoformat() if user.created_at else None
+            })
+        
+        return {
+            "status": "success",
+            "users_count": len(users_list),
+            "users": users_list
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+@app.post("/users", response_model=UserResponse)
+async def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    try:
+        print(f"📝 دریافت اطلاعات کاربر برای ثبت‌نام:")
+        print(f"   نام: {user.first_name} {user.last_name}")
+        print(f"   ایمیل: {user.email}")
+        print(f"   کد ملی: {user.national_id}")
+        print(f"   تلفن: {user.phone_number}")
+        print(f"   کشور: {user.country}")
+        print(f"   استان: {user.province}")
+        print(f"   شهر: {user.city}")
+        
+        required_fields = {
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "national_id": user.national_id,
+            "phone_number": user.phone_number,
+            "country": user.country,
+            "province": user.province,
+            "city": user.city,
+            "gender": user.gender,
+            "password": user.password
+        }
+        
+        missing_fields = [field for field, value in required_fields.items() if not value]
+        if missing_fields:
+            raise HTTPException(status_code=400, detail=f"فیلدهای زیر الزامی هستند: {', '.join(missing_fields)}")
+        
+        if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", user.email):
+            raise HTTPException(status_code=400, detail="فرمت ایمیل نامعتبر است")
+        
+        existing_user = db.query(User).filter(User.email == user.email).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="این ایمیل قبلاً ثبت شده است")
+        
+        existing_national = db.query(User).filter(User.national_id == user.national_id).first()
+        if existing_national:
+            raise HTTPException(status_code=400, detail="این کد ملی قبلاً ثبت شده است")
+        
+        existing_phone = db.query(User).filter(User.phone_number == user.phone_number).first()
+        if existing_phone:
+            raise HTTPException(status_code=400, detail="این شماره تلفن قبلاً ثبت شده است")
+        
+        if not user.national_id.isdigit() or len(user.national_id) != 10:
+            raise HTTPException(status_code=400, detail="کد ملی باید 10 رقم باشد")
+        
+        if not user.phone_number.startswith("09") or len(user.phone_number) != 11 or not user.phone_number.isdigit():
+            raise HTTPException(status_code=400, detail="شماره تلفن باید 11 رقم و با 09 شروع شود")
+        
+        if len(user.password) < 6:
+            raise HTTPException(status_code=400, detail="رمز عبور باید حداقل 6 کاراکتر باشد")
+        
+        if user.gender not in ['male', 'female']:
+            raise HTTPException(status_code=400, detail="جنسیت باید مرد یا زن باشد")
+        
+        hashed_password = get_password_hash(user.password)
+        
+        db_user = User(
+            first_name=user.first_name,
+            last_name=user.last_name,
+            email=user.email,
+            national_id=user.national_id,
+            phone_number=user.phone_number,
+            country=user.country,
+            province=user.province,
+            city=user.city,
+            gender=user.gender,
+            password=hashed_password
+        )
+        
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+        
+        print(f"✅ کاربر با موفقیت ایجاد شد: {db_user.id} - {db_user.email}")
+        
+        return UserResponse(
+            id=db_user.id,
+            first_name=db_user.first_name,
+            last_name=db_user.last_name,
+            email=db_user.email,
+            national_id=db_user.national_id,
+            phone_number=db_user.phone_number,
+            country=db_user.country,
+            province=db_user.province,
+            city=db_user.city,
+            gender=db_user.gender,
+            created_at=db_user.created_at
+        )
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ خطا در ایجاد کاربر: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"خطای سرور در ایجاد کاربر: {str(e)}")
+
+@app.post("/token", response_model=Token)
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    try:
+        print(f"🔐 تلاش برای ورود کاربر: {form_data.username}")
+        
+        user = db.query(User).filter(User.email == form_data.username).first()
+        if not user:
+            print("❌ کاربر یافت نشد")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="ایمیل یا رمز عبور اشتباه است",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        print(f"🔍 کاربر پیدا شد: {user.email}")
+        
+        if not verify_password(form_data.password, user.password):
+            print("❌ رمز عبور نادرست")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="ایمیل یا رمز عبور اشتباه است",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        access_token = create_access_token(data={"sub": user.email})
+        print(f"✅ ورود موفقیت‌آمیز برای کاربر: {user.id}")
+        return {"access_token": access_token, "token_type": "bearer", "user_id": user.id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ خطا در ورود: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در ورود")
+
+@app.post("/login")
+async def login_debug(login_data: LoginRequest, db: Session = Depends(get_db)):
+    try:
+        print(f"🔐 درخواست login جدید: {login_data.username}")
+        
+        user = db.query(User).filter(User.email == login_data.username).first()
+        if not user:
+            print("❌ کاربر یافت نشد")
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "ایمیل یا رمز عبور اشتباه است"}
+            )
+        
+        print(f"🔍 کاربر پیدا شد: {user.email}")
+        
+        if not verify_password(login_data.password, user.password):
+            print("❌ رمز عبور نادرست")
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "ایمیل یا رمز عبور اشتباه است"}
+            )
+        
+        access_token = create_access_token(data={"sub": user.email})
+        print(f"✅ ورود موفقیت‌آمیز برای کاربر: {user.id}")
+        return {"access_token": access_token, "token_type": "bearer", "user_id": user.id}
+        
+    except Exception as e:
+        print(f"❌ خطا در ورود: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "خطای سرور در ورود"}
+        )
+
+def generate_recurring_events(base_event: EventCreate, db: Session) -> List[Event]:
+    events = []
+    
+    if not base_event.repeat_pattern:
+        db_event = Event(
+            title=base_event.title,
+            time=base_event.time,
+            location=base_event.location,
+            latitude=base_event.latitude,
+            longitude=base_event.longitude,
+            host=base_event.host,
+            creator=base_event.creator,
+            type=base_event.type,
+            city=base_event.city,
+            province=base_event.province,
+            country=base_event.country,
+            capacity=base_event.capacity,
+            is_free=base_event.is_free,
+            price=base_event.price
+        )
+        events.append(db_event)
+        return events
+    
+    pattern = base_event.repeat_pattern
+    current_date = base_event.time
+    event_count = 1
+    
+    end_date = pattern.end_date
+    max_occurrences = pattern.occurrences or 365
+    
+    first_event = Event(
+        title=base_event.title,
+        time=current_date,
+        location=base_event.location,
+        latitude=base_event.latitude,
+        longitude=base_event.longitude,
+        host=base_event.host,
+        creator=base_event.creator,
+        type=base_event.type,
+        city=base_event.city,
+        province=base_event.province,
+        country=base_event.country,
+        capacity=base_event.capacity,
+        is_free=base_event.is_free,
+            price=base_event.price
+        )
+    events.append(first_event)
+    
+    while event_count < max_occurrences:
+        if end_date and current_date > end_date:
+            break
+        
+        if pattern.type == 'daily':
+            current_date = current_date + timedelta(days=pattern.interval)
+        elif pattern.type == 'weekly':
+            current_date = current_date + timedelta(weeks=pattern.interval)
+            if pattern.days:
+                current_weekday = current_date.weekday()
+                for day in sorted(pattern.days):
+                    if day > current_weekday:
+                        days_to_add = day - current_weekday
+                        current_date = current_date + timedelta(days=days_to_add)
+                        break
+        elif pattern.type == 'monthly':
+            next_month = current_date.month + pattern.interval
+            next_year = current_date.year + (next_month - 1) // 12
+            next_month = (next_month - 1) % 12 + 1
+            
+            if pattern.day_of_month:
+                day_of_month = pattern.day_of_month
+            else:
+                day_of_month = current_date.day
+            
+            try:
+                current_date = current_date.replace(year=next_year, month=next_month, day=day_of_month)
+            except ValueError:
+                import calendar
+                last_day = calendar.monthrange(next_year, next_month)[1]
+                current_date = current_date.replace(year=next_year, month=next_month, day=last_day)
+        
+        elif pattern.type == 'yearly':
+            current_date = current_date.replace(year=current_date.year + pattern.interval)
+        
+        if end_date and current_date > end_date:
+            break
+        
+        new_event = Event(
+            title=base_event.title,
+            time=current_date,
+            location=base_event.location,
+            latitude=base_event.latitude,
+            longitude=base_event.longitude,
+            host=base_event.host,
+            creator=base_event.creator,
+            type=base_event.type,
+            city=base_event.city,
+            province=base_event.province,
+            country=base_event.country,
+            capacity=base_event.capacity,
+            is_free=base_event.is_free,
+            price=base_event.price
+        )
+        events.append(new_event)
+        event_count += 1
+        
+        if event_count >= 365:
+            break
+    
+    return events
+
+@app.post("/events", response_model=EventResponse)
+async def create_event(event: EventCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        print(f"📝 دریافت درخواست ایجاد رویداد از کاربر: {current_user.email if current_user else 'Anonymous'}")
+        print(f"   عنوان: {event.title}")
+        print(f"   موقعیت: {event.latitude}, {event.longitude}")
+        print(f"   نوع: {event.type}")
+        print(f"   شهر: {event.city}")
+        print(f"   استان: {event.province}")
+        print(f"   رایگان: {event.is_free}")
+        print(f"   قیمت: {event.price}")
+        
+        if event.repeat_pattern:
+            print(f"   الگوی تکرار: {event.repeat_pattern.type}")
+            if event.repeat_pattern.days:
+                print(f"   روزهای هفته: {event.repeat_pattern.days}")
+        
+        if not all([event.title, event.time, event.location]):
+            raise HTTPException(status_code=400, detail="لطفاً همه فیلدها را پر کنید")
+        
+        user_exists = db.query(User).filter(User.id == event.creator).first()
+        if not user_exists:
+            raise HTTPException(status_code=400, detail="کاربر ایجاد کننده معتبر نیست")
+        
+        if not event.city:
+            event.city = current_user.city if current_user else "تهران"
+        if not event.province:
+            event.province = current_user.province if current_user else "تهران"
+        
+        events_to_create = generate_recurring_events(event, db)
+        created_events = []
+        
+        for event_obj in events_to_create:
+            db.add(event_obj)
+            db.flush()
+            created_events.append(event_obj)
+        
+        db.commit()
+        
+        for event_obj in created_events:
+            db.refresh(event_obj)
+        
+        print(f"✅ {len(created_events)} رویداد با موفقیت ایجاد شد")
+        
+        return EventResponse(
+            id=created_events[0].id,
+            title=created_events[0].title,
+            time=created_events[0].time,
+            location=created_events[0].location,
+            latitude=created_events[0].latitude,
+            longitude=created_events[0].longitude,
+            host=created_events[0].host,
+            creator=created_events[0].creator,
+            created_at=created_events[0].created_at,
+            type=created_events[0].type,
+            city=created_events[0].city,
+            province=created_events[0].province,
+            country=created_events[0].country,
+            capacity=created_events[0].capacity,
+            active=created_events[0].active,
+            is_free=created_events[0].is_free,
+            price=created_events[0].price
+        )
+        
+    except Exception as e:
+        db.rollback()
+        print(f"❌ خطا در ایجاد رویداد: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در ایجاد رویداد")
+
+@app.get("/events", response_model=List[EventResponse])
+async def get_events(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        print(f"📋 دریافت درخواست لیست رویدادها از کاربر: {current_user.email if current_user else 'Anonymous'}")
+        events = db.query(Event).all()
+        
+        events_list = []
+        for event in events:
+            avg_rating_result = db.query(func.avg(Comment.rating)).filter(Comment.event_id == event.id).scalar()
+            average_rating = round(float(avg_rating_result or 0), 1)
+            
+            comment_count = db.query(Comment).filter(Comment.event_id == event.id).count()
+            
+            current_participants = db.query(EventParticipant).filter(EventParticipant.event_id == event.id).count()
+            
+            # بررسی آیا رویداد مورد علاقه کاربر است
+            is_favorite = False
+            if current_user:
+                favorite = db.query(UserFavorite).filter(
+                    UserFavorite.user_id == current_user.id,
+                    UserFavorite.event_id == event.id
+                ).first()
+                is_favorite = favorite is not None
+            
+            event_dict = {
+                "id": event.id,
+                "title": event.title,
+                "time": event.time,
+                "location": event.location,
+                "latitude": event.latitude,
+                "longitude": event.longitude,
+                "host": event.host,
+                "creator": event.creator,
+                "created_at": event.created_at,
+                "type": getattr(event, 'type', 'religious'),
+                "city": getattr(event, 'city', 'تهران'),
+                "province": getattr(event, 'province', 'تهران'),
+                "country": getattr(event, 'country', 'iran'),
+                "capacity": getattr(event, 'capacity', 100),
+                "active": getattr(event, 'active', 1),
+                "is_free": getattr(event, 'is_free', True),
+                "price": getattr(event, 'price', 0.0),
+                "average_rating": average_rating,
+                "comment_count": comment_count,
+                "current_participants": current_participants,
+                "is_favorite": is_favorite
+            }
+            events_list.append(event_dict)
+        
+        return events_list
+    except Exception as e:
+        print(f"خطا در دریافت رویدادها: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادها")
+
+# اضافه کردن endpoint جدید برای events/optimized
+@app.get("/events/optimized", response_model=List[EventResponse])
+async def get_events_optimized(
+    current_user: Optional[User] = Depends(get_optional_current_user), 
+    db: Session = Depends(get_db)
+):
+    """Endpoint جدید برای دریافت بهینه‌شده رویدادها"""
+    try:
+        print(f"📋 دریافت درخواست لیست رویدادهای بهینه‌شده")
+        events = db.query(Event).all()
+        
+        events_list = []
+        for event in events:
+            avg_rating_result = db.query(func.avg(Comment.rating)).filter(Comment.event_id == event.id).scalar()
+            average_rating = round(float(avg_rating_result or 0), 1)
+            
+            comment_count = db.query(Comment).filter(Comment.event_id == event.id).count()
+            
+            current_participants = db.query(EventParticipant).filter(EventParticipant.event_id == event.id).count()
+            
+            # بررسی آیا رویداد مورد علاقه کاربر است
+            is_favorite = False
+            if current_user:
+                favorite = db.query(UserFavorite).filter(
+                    UserFavorite.user_id == current_user.id,
+                    UserFavorite.event_id == event.id
+                ).first()
+                is_favorite = favorite is not None
+            
+            event_dict = {
+                "id": event.id,
+                "title": event.title,
+                "time": event.time,
+                "location": event.location,
+                "latitude": event.latitude,
+                "longitude": event.longitude,
+                "host": event.host,
+                "creator": event.creator,
+                "created_at": event.created_at,
+                "type": getattr(event, 'type', 'religious'),
+                "city": getattr(event, 'city', 'تهران'),
+                "province": getattr(event, 'province', 'تهران'),
+                "country": getattr(event, 'country', 'iran'),
+                "capacity": getattr(event, 'capacity', 100),
+                "active": getattr(event, 'active', 1),
+                "is_free": getattr(event, 'is_free', True),
+                "price": getattr(event, 'price', 0.0),
+                "average_rating": average_rating,
+                "comment_count": comment_count,
+                "current_participants": current_participants,
+                "is_favorite": is_favorite
+            }
+            events_list.append(event_dict)
+        
+        print(f"✅ {len(events_list)} رویداد بهینه‌شده بازگردانده شد")
+        return events_list
+    except Exception as e:
+        print(f"خطا در دریافت رویدادهای بهینه‌شده: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادها")
+
+@app.get("/events/public", response_model=List[EventResponse])
+async def get_public_events(db: Session = Depends(get_db)):
+    try:
+        print("📋 دریافت درخواست لیست رویدادهای عمومی")
+        events = db.query(Event).all()
+        
+        events_list = []
+        for event in events:
+            avg_rating_result = db.query(func.avg(Comment.rating)).filter(Comment.event_id == event.id).scalar()
+            average_rating = round(float(avg_rating_result or 0), 1)
+            
+            comment_count = db.query(Comment).filter(Comment.event_id == event.id).count()
+            
+            current_participants = db.query(EventParticipant).filter(EventParticipant.event_id == event.id).count()
+            
+            event_dict = {
+                "id": event.id,
+                "title": event.title,
+                "time": event.time,
+                "location": event.location,
+                "latitude": event.latitude,
+                "longitude": event.longitude,
+                "host": event.host,
+                "creator": event.creator,
+                "created_at": event.created_at,
+                "type": getattr(event, 'type', 'religious'),
+                "city": getattr(event, 'city', 'تهران'),
+                "province": getattr(event, 'province', 'تهران'),
+                "country": getattr(event, 'country', 'iran'),
+                "capacity": getattr(event, 'capacity', 100),
+                "active": getattr(event, 'active', 1),
+                "is_free": getattr(event, 'is_free', True),
+                "price": getattr(event, 'price', 0.0),
+                "average_rating": average_rating,
+                "comment_count": comment_count,
+                "current_participants": current_participants,
+                "is_favorite": False
+            }
+            events_list.append(event_dict)
+        
+        return events_list
+    except Exception as e:
+        print(f"خطا در دریافت رویدادهای عمومی: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادها")
+
+@app.put("/events/{event_id}/update-fields")
+async def update_event_fields(event_id: int, db: Session = Depends(get_db)):
+    try:
+        db_event = db.query(Event).filter(Event.id == event_id).first()
+        if not db_event:
+            raise HTTPException(status_code=404, detail="رویداد یافت نشد")
+        
+        creator_user = db.query(User).filter(User.id == db_event.creator).first()
+        
+        if not hasattr(db_event, 'type') or not db_event.type:
+            db_event.type = "religious"
+        if not hasattr(db_event, 'city') or not db_event.city:
+            db_event.city = creator_user.city if creator_user else "تهران"
+        if not hasattr(db_event, 'province') or not db_event.province:
+            db_event.province = creator_user.province if creator_user else "تهران"
+        if not hasattr(db_event, 'country') or not db_event.country:
+            db_event.country = "iran"
+        if not hasattr(db_event, 'capacity') or not db_event.capacity:
+            db_event.capacity = 100
+        if not hasattr(db_event, 'active') or db_event.active is None:
+            db_event.active = 1
+        if not hasattr(db_event, 'is_free') or db_event.is_free is None:
+            db_event.is_free = True
+        if not hasattr(db_event, 'price') or db_event.price is None:
+            db_event.price = 0.0
+        
+        db.commit()
+        db.refresh(db_event)
+        
+        return {"message": "فیلدهای رویداد با موفقیت به‌روزرسانی شد", "event": db_event}
+        
+    except Exception as e:
+        db.rollback()
+        print(f"❌ خطا در به‌روزرسانی رویداد: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در به‌روزرسانی رویداد")
+
+@app.get("/users/{user_id}", response_model=UserResponse)
+async def get_user(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+        return user
+    except Exception as e:
+        print(f"خطا در دریافت اطلاعات کاربر: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در دریافت اطلاعات کاربر")
+
+@app.get("/users/me", response_model=UserResponse)
+async def get_current_user_info(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        return current_user
+    except Exception as e:
+        print(f"خطا در دریافت اطلاعات کاربر جاری: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در دریافت اطلاعات کاربر")
+
+# اضافه کردن endpoint جدید برای آمار کاربر
+@app.get("/users/{user_id}/stats", response_model=UserStatsResponse)
+async def get_user_stats(
+    user_id: int, 
+    current_user: Optional[User] = Depends(get_optional_current_user), 
+    db: Session = Depends(get_db)
+):
+    """دریافت آمار کاربر با پشتیبانی از کاربران مهمان"""
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+        
+        # اگر کاربر جاری وجود ندارد یا کاربر جاری با کاربر درخواستی متفاوت است،
+        # فقط اطلاعات عمومی را برگردان
+        if not current_user or current_user.id != user_id:
+            return {
+                "events_count": 0,
+                "notifications_count": 0,
+                "favorites_count": 0,
+                "join_year": user.created_at.year if user.created_at else 2024
+            }
+        
+        # کاربر معتبر است، اطلاعات کامل را برگردان
+        events_count = db.query(Event).filter(Event.creator == user_id).count()
+        
+        # تعداد نوتیفیکیشن‌های خوانده نشده
+        notifications_count = db.query(Notification).filter(
+            Notification.user_id == user_id,
+            Notification.read == False
+        ).count()
+        
+        # تعداد علاقه‌مندی‌ها
+        favorites_count = db.query(UserFavorite).filter(UserFavorite.user_id == user_id).count()
+        
+        join_year = user.created_at.year if user.created_at else 2024
+        
+        return {
+            "events_count": events_count,
+            "notifications_count": notifications_count,
+            "favorites_count": favorites_count,
+            "join_year": join_year
+        }
+        
+    except Exception as e:
+        print(f"خطا در دریافت آمار کاربر: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در دریافت آمار کاربر")
+
+# اضافه کردن endpoint عمومی برای آمار کاربر
+@app.get("/users/{user_id}/stats/public")
+async def get_user_stats_public(user_id: int, db: Session = Depends(get_db)):
+    """Endpoint عمومی برای دریافت آمار کاربر (بدون نیاز به احراز هویت)"""
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+        
+        # تعداد رویدادهای ایجاد شده توسط کاربر
+        events_count = db.query(Event).filter(Event.creator == user_id).count()
+        
+        # تعداد نوتیفیکیشن‌ها
+        notifications_count = db.query(Notification).filter(Notification.user_id == user_id).count()
+        
+        # تعداد علاقه‌مندی‌ها
+        favorites_count = db.query(UserFavorite).filter(UserFavorite.user_id == user_id).count()
+        
+        # سال عضویت
+        join_year = user.created_at.year if user.created_at else 2024
+        
+        return {
+            "events_count": events_count,
+            "notifications_count": notifications_count,
+            "favorites_count": favorites_count,
+            "join_year": join_year
+        }
+    except Exception as e:
+        print(f"خطا در دریافت آمار کاربر: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در دریافت آمار کاربر")
+
+# اضافه کردن endpoint برای بررسی وضعیت توکن
+@app.get("/auth/check")
+async def check_auth(current_user: User = Depends(get_current_user)):
+    """بررسی معتبر بودن توکن"""
+    if current_user:
+        return {
+            "authenticated": True,
+            "user_id": current_user.id,
+            "email": current_user.email,
+            "name": f"{current_user.first_name} {current_user.last_name}"
+        }
+    else:
+        return {
+            "authenticated": False,
+            "user_id": None,
+            "email": None,
+            "name": None
+        }
+
+@app.post("/comments", response_model=CommentResponse)
+async def create_comment(comment: CommentCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        print(f"💬 دریافت نظر جدید برای رویداد {comment.event_id}")
+        
+        event = db.query(Event).filter(Event.id == comment.event_id).first()
+        if not event:
+            raise HTTPException(status_code=404, detail="رویداد یافت نشد")
+        
+        user = db.query(User).filter(User.id == comment.user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+        
+        if comment.rating < 1 or comment.rating > 5:
+            raise HTTPException(status_code=400, detail="امتیاز باید بین 1 تا 5 باشد")
+        
+        existing_comment = db.query(Comment).filter(
+            Comment.event_id == comment.event_id,
+            Comment.user_id == comment.user_id
+        ).first()
+        
+        if existing_comment:
+            existing_comment.comment = comment.comment
+            existing_comment.rating = comment.rating
+            db_comment = existing_comment
+        else:
+            db_comment = Comment(
+                event_id=comment.event_id,
+                user_id=comment.user_id,
+                comment=comment.comment,
+                rating=comment.rating
+            )
+            db.add(db_comment)
+        
+        db.commit()
+        db.refresh(db_comment)
+        
+        comment_response = CommentResponse(
+            id=db_comment.id,
+            event_id=db_comment.event_id,
+            user_id=db_comment.user_id,
+            comment=db_comment.comment,
+            rating=db_comment.rating,
+            created_at=db_comment.created_at,
+            user_name=f"{user.first_name} {user.last_name}"
+        )
+        
+        print(f"✅ نظر با موفقیت ثبت شد")
+        return comment_response
+        
+    except Exception as e:
+        db.rollback()
+        print(f"❌ خطا در ثبت نظر: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در ثبت نظر")
+
+@app.get("/comments/{event_id}", response_model=List[CommentResponse])
+async def get_comments(event_id: int, db: Session = Depends(get_db)):
+    try:
+        print(f"📋 دریافت نظرات برای رویداد {event_id}")
+        
+        event = db.query(Event).filter(Event.id == event_id).first()
+        if not event:
+            raise HTTPException(status_code=404, detail="رویداد یافت نشد")
+        
+        comments = db.query(Comment).filter(Comment.event_id == event_id).order_by(Comment.created_at.desc()).all()
+        
+        comments_with_names = []
+        for comment in comments:
+            user = db.query(User).filter(User.id == comment.user_id).first()
+            comment_response = CommentResponse(
+                id=comment.id,
+                event_id=comment.event_id,
+                user_id=comment.user_id,
+                comment=comment.comment,
+                rating=comment.rating,
+                created_at=comment.created_at,
+                user_name=f"{user.first_name} {user.last_name}" if user else "کاربر ناشناس"
+            )
+            comments_with_names.append(comment_response)
+        
+        return comments_with_names
+    except Exception as e:
+        print(f"خطا در دریافت نظرات: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در دریافت نظرات")
+
+@app.post("/events/{event_id}/register")
+async def register_for_event(event_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        print(f"🎫 ثبت‌نام کاربر {current_user.id} برای رویداد {event_id}")
+        
+        event = db.query(Event).filter(Event.id == event_id).first()
+        if not event:
+            raise HTTPException(status_code=404, detail="رویداد یافت نشد")
+        
+        existing_registration = db.query(EventParticipant).filter(
+            EventParticipant.event_id == event_id,
+            EventParticipant.user_id == current_user.id
+        ).first()
+        
+        if existing_registration:
+            raise HTTPException(status_code=400, detail="شما قبلاً در این رویداد ثبت‌نام کرده‌اید")
+        
+        current_participants = db.query(EventParticipant).filter(EventParticipant.event_id == event_id).count()
+        if current_participants >= event.capacity:
+            raise HTTPException(status_code=400, detail="ظرفیت رویداد تکمیل شده است")
+        
+        registration = EventParticipant(
+            event_id=event_id,
+            user_id=current_user.id
+        )
+        db.add(registration)
+        db.commit()
+        db.refresh(registration)
+        
+        # ایجاد نوتیفیکیشن
+        notification = Notification(
+            user_id=current_user.id,
+            title="ثبت‌نام موفق",
+            message=f"شما با موفقیت در رویداد '{event.title}' ثبت‌نام کردید.",
+            type="success"
+        )
+        db.add(notification)
+        db.commit()
+        
+        return {"message": "ثبت‌نام با موفقیت انجام شد", "registration_id": registration.id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ خطا در ثبت‌نام: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در ثبت‌نام")
+
+@app.get("/events/{event_id}/participants", response_model=List[EventParticipantResponse])
+async def get_event_participants(event_id: int, db: Session = Depends(get_db)):
+    try:
+        print(f"📋 دریافت لیست شرکت‌کنندگان رویداد {event_id}")
+        
+        event = db.query(Event).filter(Event.id == event_id).first()
+        if not event:
+            raise HTTPException(status_code=404, detail="رویداد یافت نشد")
+        
+        participants = db.query(EventParticipant).filter(EventParticipant.event_id == event_id).all()
+        
+        participants_with_names = []
+        for participant in participants:
+            user = db.query(User).filter(User.id == participant.user_id).first()
+            participant_response = EventParticipantResponse(
+                id=participant.id,
+                event_id=participant.event_id,
+                user_id=participant.user_id,
+                registered_at=participant.registered_at,
+                attended=participant.attended,
+                user_name=f"{user.first_name} {user.last_name}" if user else "کاربر ناشناس"
+            )
+            participants_with_names.append(participant_response)
+        
+        return participants_with_names
+    except Exception as e:
+        print(f"خطا در دریافت شرکت‌کنندگان: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در دریافت شرکت‌کنندگان")
+
+@app.get("/users/{user_id}/events")
+async def get_user_events(user_id: int, db: Session = Depends(get_db)):
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+        
+        registrations = db.query(EventParticipant).filter(EventParticipant.user_id == user_id).all()
+        event_ids = [reg.event_id for reg in registrations]
+        
+        events = db.query(Event).filter(Event.id.in_(event_ids)).all()
+        
+        events_list = []
+        for event in events:
+            avg_rating_result = db.query(func.avg(Comment.rating)).filter(Comment.event_id == event.id).scalar()
+            average_rating = round(float(avg_rating_result or 0), 1)
+            
+            comment_count = db.query(Comment).filter(Comment.event_id == event.id).count()
+            
+            event_dict = {
+                "id": event.id,
+                "title": event.title,
+                "time": event.time,
+                "location": event.location,
+                "latitude": event.latitude,
+                "longitude": event.longitude,
+                "host": event.host,
+                "creator": event.creator,
+                "created_at": event.created_at,
+                "type": getattr(event, 'type', 'religious'),
+                "city": getattr(event, 'city', 'تهران'),
+                "province": getattr(event, 'province', 'تهران'),
+                "country": getattr(event, 'country', 'iran'),
+                "capacity": getattr(event, 'capacity', 100),
+                "active": getattr(event, 'active', 1),
+                "is_free": getattr(event, 'is_free', True),
+                "price": getattr(event, 'price', 0.0),
+                "average_rating": average_rating,
+                "comment_count": comment_count
+            }
+            events_list.append(event_dict)
+        
+        return events_list
+    except Exception as e:
+        print(f"خطا در دریافت رویدادهای کاربر: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادهای کاربر")
+
+# اضافه کردن endpoint برای نوتیفیکیشن‌ها
+@app.get("/users/{user_id}/notifications", response_model=List[NotificationResponse])
+async def get_user_notifications(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        if current_user.id != user_id:
+            raise HTTPException(status_code=403, detail="دسترسی غیرمجاز")
+        
+        notifications = db.query(Notification).filter(Notification.user_id == user_id).order_by(Notification.created_at.desc()).all()
+        return notifications
+    except Exception as e:
+        print(f"خطا در دریافت نوتیفیکیشن‌ها: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در دریافت نوتیفیکیشن‌ها")
+
+@app.get("/users/{user_id}/notifications/unread-count")
+async def get_unread_notifications_count(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        if current_user.id != user_id:
+            raise HTTPException(status_code=403, detail="دسترسی غیرمجاز")
+        
+        unread_count = db.query(Notification).filter(
+            Notification.user_id == user_id,
+            Notification.read == False
+        ).count()
+        
+        return {"unread_count": unread_count}
+    except Exception as e:
+        print(f"خطا در دریافت تعداد نوتیفیکیشن‌های خوانده نشده: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در دریافت تعداد نوتیفیکیشن‌ها")
+
+@app.put("/notifications/{notification_id}/mark-read")
+async def mark_notification_read(notification_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        notification = db.query(Notification).filter(Notification.id == notification_id).first()
+        if not notification:
+            raise HTTPException(status_code=404, detail="نوتیفیکیشن یافت نشد")
+        
+        if notification.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="دسترسی غیرمجاز")
+        
+        notification.read = True
+        db.commit()
+        
+        return {"message": "نوتیفیکیشن به عنوان خوانده شده علامت گذاری شد"}
+    except Exception as e:
+        db.rollback()
+        print(f"خطا در علامت گذاری نوتیفیکیشن: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در به‌روزرسانی نوتیفیکیشن")
+
+@app.put("/users/{user_id}/notifications/mark-all-read")
+async def mark_all_notifications_read(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        if current_user.id != user_id:
+            raise HTTPException(status_code=403, detail="دسترسی غیرمجاز")
+        
+        db.query(Notification).filter(
+            Notification.user_id == user_id,
+            Notification.read == False
+        ).update({"read": True})
+        
+        db.commit()
+        
+        return {"message": "همه نوتیفیکیشن‌ها به عنوان خوانده شده علامت گذاری شدند"}
+    except Exception as e:
+        db.rollback()
+        print(f"خطا در علامت گذاری همه نوتیفیکیشن‌ها: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در به‌روزرسانی نوتیفیکیشن‌ها")
+
+# اضافه کردن endpoint برای علاقه‌مندی‌ها
+@app.post("/favorites", response_model=FavoriteResponse)
+async def add_to_favorites(favorite: FavoriteCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        print(f"❤️ افزودن رویداد {favorite.event_id} به علاقه‌مندی‌های کاربر {favorite.user_id}")
+        
+        # بررسی وجود رویداد
+        event = db.query(Event).filter(Event.id == favorite.event_id).first()
+        if not event:
+            raise HTTPException(status_code=404, detail="رویداد یافت نشد")
+        
+        # بررسی وجود کاربر
+        user = db.query(User).filter(User.id == favorite.user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+        
+        # بررسی آیا قبلاً به علاقه‌مندی اضافه شده
+        existing_favorite = db.query(UserFavorite).filter(
+            UserFavorite.user_id == favorite.user_id,
+            UserFavorite.event_id == favorite.event_id
+        ).first()
+        
+        if existing_favorite:
+            raise HTTPException(status_code=400, detail="این رویداد قبلاً به علاقه‌مندی‌ها اضافه شده است")
+        
+        # ایجاد علاقه‌مندی جدید
+        db_favorite = UserFavorite(
+            user_id=favorite.user_id,
+            event_id=favorite.event_id
+        )
+        db.add(db_favorite)
+        db.commit()
+        db.refresh(db_favorite)
+        
+        print(f"✅ رویداد به علاقه‌مندی‌ها اضافه شد")
+        return db_favorite
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ خطا در افزودن به علاقه‌مندی‌ها: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در افزودن به علاقه‌مندی‌ها")
+
+@app.delete("/favorites/{user_id}/{event_id}")
+async def remove_from_favorites(user_id: int, event_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        print(f"🗑️ حذف رویداد {event_id} از علاقه‌مندی‌های کاربر {user_id}")
+        
+        if current_user.id != user_id:
+            raise HTTPException(status_code=403, detail="دسترسی غیرمجاز")
+        
+        favorite = db.query(UserFavorite).filter(
+            UserFavorite.user_id == user_id,
+            UserFavorite.event_id == event_id
+        ).first()
+        
+        if not favorite:
+            raise HTTPException(status_code=404, detail="این رویداد در علاقه‌مندی‌ها یافت نشد")
+        
+        db.delete(favorite)
+        db.commit()
+        
+        print(f"✅ رویداد از علاقه‌مندی‌ها حذف شد")
+        return {"message": "رویداد از علاقه‌مندی‌ها حذف شد"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ خطا در حذف از علاقه‌مندی‌ها: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در حذف از علاقه‌مندی‌ها")
+
+@app.get("/users/{user_id}/favorites", response_model=List[EventResponse])
+async def get_user_favorites(user_id: int, db: Session = Depends(get_db)):
+    try:
+        print(f"📋 دریافت علاقه‌مندی‌های کاربر {user_id}")
+        
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+        
+        favorites = db.query(UserFavorite).filter(UserFavorite.user_id == user_id).all()
+        event_ids = [fav.event_id for fav in favorites]
+        
+        events = db.query(Event).filter(Event.id.in_(event_ids)).all()
+        
+        events_list = []
+        for event in events:
+            avg_rating_result = db.query(func.avg(Comment.rating)).filter(Comment.event_id == event.id).scalar()
+            average_rating = round(float(avg_rating_result or 0), 1)
+            
+            comment_count = db.query(Comment).filter(Comment.event_id == event.id).count()
+            
+            current_participants = db.query(EventParticipant).filter(EventParticipant.event_id == event.id).count()
+            
+            event_dict = {
+                "id": event.id,
+                "title": event.title,
+                "time": event.time,
+                "location": event.location,
+                "latitude": event.latitude,
+                "longitude": event.longitude,
+                "host": event.host,
+                "creator": event.creator,
+                "created_at": event.created_at,
+                "type": getattr(event, 'type', 'religious'),
+                "city": getattr(event, 'city', 'تهران'),
+                "province": getattr(event, 'province', 'تهران'),
+                "country": getattr(event, 'country', 'iran'),
+                "capacity": getattr(event, 'capacity', 100),
+                "active": getattr(event, 'active', 1),
+                "is_free": getattr(event, 'is_free', True),
+                "price": getattr(event, 'price', 0.0),
+                "average_rating": average_rating,
+                "comment_count": comment_count,
+                "current_participants": current_participants,
+                "is_favorite": True
+            }
+            events_list.append(event_dict)
+        
+        return events_list
+    except Exception as e:
+        print(f"خطا در دریافت علاقه‌مندی‌ها: {e}")
+        raise HTTPException(status_code=500, detail="خطای سرور در دریافت علاقه‌مندی‌ها")
+
+@app.get("/geocode")
+async def geocode_address(lat: float, lng: float):
+    try:
+        import requests
+        
+        url = f"https://nominatim.openstreetmap.org/reverse"
+        params = {
+            'format': 'json',
+            'lat': lat,
+            'lon': lng,
+            'zoom': 18,
+            'addressdetails': 1,
+            'accept-language': 'fa'
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
+        
+        if data and 'address' in data:
+            address = data['address']
+            address_parts = []
+            
+            if 'road' in address:
+                address_parts.append(address['road'])
+            if 'neighbourhood' in address:
+                address_parts.append(address['neighbourhood'])
+            if 'suburb' in address:
+                address_parts.append(address['suburb'])
+            if 'city' in address:
+                address_parts.append(address['city'])
+            if 'state' in address:
+                address_parts.append(address['state'])
+            if 'country' in address:
+                address_parts.append(address['country'])
+            
+            formatted_address = '، '.join(address_parts)
+            return {"address": formatted_address, "raw": address}
+        else:
+            return {"address": "آدرس نامشخص", "raw": {}}
+            
+    except Exception as e:
+        print(f"خطا در جستجوی آدرس: {e}")
+        return {"address": "خطا در دریافت آدرس", "raw": {}}
+
+@app.options("/{path:path}")
+async def options_route(path: str):
+    return JSONResponse(content={"status": "ok"})
+
+@app.get("/")
+async def root():
+    return {
+        "message": "خوش آمدید به پلتفرم مناره",
+        "version": "1.0.0",
+        "status": "فعال"
+    }
+
+@app.get("/test-db")
+async def test_db(db: Session = Depends(get_db)):
+    try:
+        users_count = db.query(User).count()
+        events_count = db.query(Event).count()
+        comments_count = db.query(Comment).count()
+        participants_count = db.query(EventParticipant).count()
+        favorites_count = db.query(UserFavorite).count()
+        
+        users = db.query(User).all()
+        users_list = [{"id": u.id, "email": u.email, "name": f"{u.first_name} {u.last_name}", "province": u.province, "city": u.city} for u in users]
+        
+        events = db.query(Event).all()
+        events_list = []
+        for event in events:
+            event_dict = {
+                "id": event.id,
+                "title": event.title,
+                "type": getattr(event, 'type', 'N/A'),
+                "city": getattr(event, 'city', 'N/A'),
+                "province": getattr(event, 'province', 'N/A'),
+                "country": getattr(event, 'country', 'N/A'),
+                "capacity": getattr(event, 'capacity', 'N/A'),
+                "active": getattr(event, 'active', 'N/A'),
+                "is_free": getattr(event, 'is_free', 'N/A'),
+                "price": getattr(event, 'price', 'N/A')
+            }
+            events_list.append(event_dict)
+        
+        return {
+            "status": "اتصال به دیتابیس موفقیت‌آمیز",
+            "users_count": users_count,
+            "events_count": events_count,
+            "comments_count": comments_count,
+            "participants_count": participants_count,
+            "favorites_count": favorites_count,
+            "users": users_list,
+            "events": events_list,
+            "database": "SQLite" if "sqlite" in DATABASE_URL else "MySQL"
+        }
+    except Exception as e:
+        return {"error": str(e), "status": "خطا در اتصال به دیتابیس"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.utcnow()}
+
+@app.on_event("startup")
+async def startup_event():
+    db = SessionLocal()
+    try:
+        users_count = db.query(User).count()
+        print(f"👥 تعداد کاربران در دیتابیس: {users_count}")
+        
+        if users_count == 0:
+            test_user = User(
+                first_name="تست",
+                last_name="کاربر",
+                email="test@example.com",
+                national_id="1234567890",
+                phone_number="09123456789",
+                country="iran",
+                province="تهران",
+                city="تهران",
+                gender="male",
+                password=get_password_hash("123456")
+            )
+            db.add(test_user)
+            db.commit()
+            print("✅ کاربر تستی ایجاد شد: test@example.com / 123456")
+        else:
+            users = db.query(User).all()
+            for user in users:
+                print(f"👤 کاربر موجود: {user.email} - {user.first_name} {user.last_name} - {user.province}, {user.city}")
+        
+        events_count = db.query(Event).count()
+        if events_count == 0 and users_count > 0:
+            test_user = db.query(User).first()
+            test_event = Event(
+                title="مراسم تستی",
+                time=datetime.utcnow() + timedelta(days=1),
+                location="مکان تستی",
+                latitude=35.6892,
+                longitude=51.3890,
+                host="امام جماعت",
+                creator=test_user.id,
+                type="religious",
+                city="تهران",
+                province="تهران",
+                country="iran",
+                capacity=100,
+                active=1,
+                is_free=True,
+                price=0.0
+            )
+            db.add(test_event)
+            db.commit()
+            print("✅ رویداد تستی ایجاد شد")
+        
+        events = db.query(Event).all()
+        updated_count = 0
+        for event in events:
+            needs_update = False
+            
+            if not hasattr(event, 'type') or not event.type:
+                event.type = "religious"
+                needs_update = True
+                
+            if not hasattr(event, 'city') or not event.city:
+                creator = db.query(User).filter(User.id == event.creator).first()
+                if creator:
+                    event.city = creator.city
+                    event.province = creator.province
+                else:
+                    event.city = "تهران"
+                    event.province = "تهران"
+                needs_update = True
+                
+            if not hasattr(event, 'country') or not event.country:
+                event.country = "iran"
+                needs_update = True
+                
+            if not hasattr(event, 'capacity') or not event.capacity:
+                event.capacity = 100
+                needs_update = True
+                
+            if not hasattr(event, 'active') or event.active is None:
+                event.active = 1
+                needs_update = True
+                
+            if not hasattr(event, 'is_free') or event.is_free is None:
+                event.is_free = True
+                needs_update = True
+                
+            if not hasattr(event, 'price') or event.price is None:
+                event.price = 0.0
+                needs_update = True
+            
+            if needs_update:
+                updated_count += 1
+        
+        if updated_count > 0:
+            db.commit()
+            print(f"✅ {updated_count} رویداد موجود با فیلدهای جدید به‌روزرسانی شدند")
+        else:
+            print("✅ همه رویدادها به‌روز هستند")
+            
+    except Exception as e:
+        print(f"❌ خطا در startup: {e}")
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    import uvicorn
+    print("🚀 شروع سرویس Manareh API...")
+    print(f"🎯 اتصال دیتابیس: {DATABASE_URL}")
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    from fastapi.staticfiles import StaticFiles
+
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
