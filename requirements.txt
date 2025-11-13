@@ -6,3 +6,4 @@ requests
 kavenegar
 pymysql
 python-jose[cryptography]
+python-multipart
