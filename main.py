@@ -452,13 +452,17 @@ def get_optional_current_user(token: str = Depends(oauth2_scheme), db: Session =
     except HTTPException:
         return None
 
-# اپلیکیشن FastAPI
-#app = FastAPI(title="Manareh API", description="پلتفرم مراسمات مناره", version="1.0.0")
-
-# تنظیمات CORS
+# تنظیمات CORS - این بخش بسیار مهم است
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://manareh.onrender.com",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "*"  # برای تست - در تولید بهتر است دامنه‌های مشخص شده باشند
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
