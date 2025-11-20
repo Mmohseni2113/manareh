@@ -3859,11 +3859,8 @@
     <script src="https://unpkg.com/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js"></script>
     
     <script>
-        // کانفیگ اولیه
-        // تغییر آدرس API به سرور Railway
-        const API_BASE_URL = 'https://your-railway-app.up.railway.app'; // آدرس سرور Railway شما
-        // یا اگر هنوز روی لوکال اجرا می‌شود:
-        // const API_BASE_URL = 'http://127.0.0.1:8000';
+        // کانفیگ اولیه - اصلاح شده برای استفاده از آدرس واقعی
+        const API_BASE_URL = "https://manareh.onrender.com";
         
         let token = localStorage.getItem('token') || null;
         let currentUserId = localStorage.getItem('userId') || null;
@@ -5968,6 +5965,9 @@
                 host: document.getElementById('eventOrganizer').value,
                 creator: currentUserId,
                 type: document.getElementById('eventType').value,
+                city: document.getElementById('eventCity')?.value || currentUserData.city || 'تهران',
+                province: document.getElementById('eventProvince')?.value || currentUserData.province || 'تهران',
+                country: document.getElementById('eventCountry')?.value || currentUserData.country || 'iran',
                 capacity: parseInt(document.getElementById('eventCapacity').value) || 100,
                 price: pricingData.price,
                 is_free: pricingData.pricing_type === 'free'
