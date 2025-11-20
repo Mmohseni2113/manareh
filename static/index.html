@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://unpkg.com/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css">
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <style>
+        /* تمام استایل‌های قبلی بدون تغییر باقی می‌مانند */
         * {
             margin: 0;
             padding: 0;
@@ -3859,7 +3860,11 @@
     
     <script>
         // کانفیگ اولیه
-        const API_BASE_URL = 'http://127.0.0.1:8000';
+        // تغییر آدرس API به سرور Railway
+        const API_BASE_URL = 'https://your-railway-app.up.railway.app'; // آدرس سرور Railway شما
+        // یا اگر هنوز روی لوکال اجرا می‌شود:
+        // const API_BASE_URL = 'http://127.0.0.1:8000';
+        
         let token = localStorage.getItem('token') || null;
         let currentUserId = localStorage.getItem('userId') || null;
         let currentUserData = JSON.parse(localStorage.getItem('userData') || '{}');
@@ -3878,6 +3883,7 @@
             return headers;
         }
 
+        // بقیه کدهای JavaScript بدون تغییر باقی می‌مانند...
         // مدیریت کارت پروفایل
         const profileIcon = document.getElementById('profileIcon');
         const profileCard = document.getElementById('profileCard');
