@@ -31,6 +31,9 @@ def home():
 def test_database_connection():
     try:
         database_urls = [
+            # اولویت اول: Railway database
+            "mysql+pymysql://root:fNCKZuguXMprcpWgfFtrxcQMXnEvVLAE@yamabiko.proxy.rlwy.net:40321/railway",
+            # دوم: اتصالات محلی به عنوان fallback
             "mysql+pymysql://M.mohseni:123m456o789h@127.0.0.1/manareh",
             "mysql+pymysql://M.mohseni:123m456o789h@localhost/manareh",
         ]
