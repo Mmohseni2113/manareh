@@ -14,6 +14,8 @@ import re
 import hashlib
 import base64
 import os
+import random
+from kavenegar import *
 
 # ایجاد اپلیکیشن
 app = FastAPI()
@@ -25,7 +27,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/")
 def home():
     return FileResponse("static/index.html")
-
 
 # تست اتصال به دیتابیس
 def test_database_connection():
@@ -75,6 +76,9 @@ SECRET_KEY = "manareh-secret-key-2024-very-secure-key-here"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
+# تنظیمات کاوه‌نگار
+KAVENEGAR_API_KEY = '6A6F54654839584E356A6633743272783851717A6C7663667477615357533163595267372B68446636426B3D'
+
 # مدل‌های دیتابیس
 class User(Base):
     __tablename__ = "users"
@@ -90,6 +94,9 @@ class User(Base):
     gender = Column(String(10), nullable=False)
     password = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    verification_code = Column(String(10), nullable=True)
+    code_expire_time = Column(DateTime, nullable=True)
+    is_verified = Column(Boolean, default=False)
 
 class Event(Base):
     __tablename__ = "events"
@@ -152,6 +159,29 @@ def check_and_create_missing_columns():
     try:
         inspector = inspect(engine)
         
+        # بررسی فیلدهای users
+        users_columns = [col['name'] for col in inspector.get_columns('users')]
+        missing_columns = []
+        
+        expected_columns = ['verification_code', 'code_expire_time', 'is_verified']
+        for col in expected_columns:
+            if col not in users_columns:
+                missing_columns.append(col)
+        
+        if missing_columns:
+            print(f"🔧 ایجاد فیلدهای جدید در users: {missing_columns}")
+            
+            for col in missing_columns:
+                if col == 'verification_code':
+                    db.execute(text("ALTER TABLE users ADD COLUMN verification_code VARCHAR(10)"))
+                elif col == 'code_expire_time':
+                    db.execute(text("ALTER TABLE users ADD COLUMN code_expire_time DATETIME"))
+                elif col == 'is_verified':
+                    db.execute(text("ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE"))
+            
+            db.commit()
+            print("✅ فیلدهای جدید در users ایجاد شدند")
+        
         # بررسی فیلدهای events
         events_columns = [col['name'] for col in inspector.get_columns('events')]
         missing_columns = []
@@ -162,7 +192,7 @@ def check_and_create_missing_columns():
                 missing_columns.append(col)
         
         if missing_columns:
-            print(f"🔧 ایجاد فیلدهای جدید: {missing_columns}")
+            print(f"🔧 ایجاد فیلدهای جدید در events: {missing_columns}")
             
             for col in missing_columns:
                 if col == 'type':
@@ -183,7 +213,7 @@ def check_and_create_missing_columns():
                     db.execute(text("ALTER TABLE events ADD COLUMN price FLOAT DEFAULT 0.0"))
             
             db.commit()
-            print("✅ فیلدهای جدید ایجاد شدند")
+            print("✅ فیلدهای جدید در events ایجاد شدند")
         
         # بررسی وجود جدول comments
         if 'comments' not in inspector.get_table_names():
@@ -267,6 +297,7 @@ class UserResponse(BaseModel):
     city: str
     gender: str
     created_at: datetime
+    is_verified: bool
 
     class Config:
         from_attributes = True
@@ -393,6 +424,15 @@ class FavoriteResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# مدل‌های جدید برای OTP
+class OTPSendRequest(BaseModel):
+    phone_number: str
+    email: str
+
+class OTPVerifyRequest(BaseModel):
+    email: str
+    code: str
+
 # توابع کمکی برای هش کردن رمز عبور
 def get_password_hash(password: str) -> str:
     """هش ساده رمز عبور با SHA-256 + salt"""
@@ -467,6 +507,55 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 📤 ارسال OTP
+@app.post("/send-otp")
+def send_otp(req: OTPSendRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == req.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+
+    code = random.randint(10000, 99999)  # ساخت کد ۵ رقمی
+
+    try:
+        api = KavenegarAPI(KAVENEGAR_API_KEY)
+        params = {
+            'sender': '2000660110',
+            'receptor': req.phone_number,
+            'message': f'کد تایید مناره: {code}'
+        }
+        response = api.sms_send(params)
+        print(f"✅ پیامک ارسال شد: {response}")
+    except APIException as e:
+        print(f"❌ خطا در ارسال پیامک: {e}")
+        # حتی اگر پیامک ارسال نشد، کد را در دیتابیس ذخیره می‌کنیم
+    except HTTPException as e:
+        print(f"❌ خطای HTTP در ارسال پیامک: {e}")
+    except Exception as e:
+        print(f"❌ خطای ناشناخته در ارسال پیامک: {e}")
+
+    user.verification_code = str(code)
+    user.code_expire_time = datetime.utcnow() + timedelta(minutes=2)
+    db.commit()
+
+    return {"message": "کد ارسال شد"}
+
+# ✔ تایید OTP
+@app.post("/verify-otp")
+def verify_otp(req: OTPVerifyRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == req.email).first()
+
+    if not user or user.verification_code != req.code:
+        raise HTTPException(status_code=400, detail="کد اشتباه است")
+    
+    if datetime.utcnow() > user.code_expire_time:
+        raise HTTPException(status_code=400, detail="کد منقضی شده است")
+
+    user.is_verified = True
+    user.verification_code = None
+    db.commit()
+
+    return {"message": "شماره تایید شد"}
 
 @app.get("/debug-db")
 async def debug_db():
@@ -554,7 +643,9 @@ async def debug_users(db: Session = Depends(get_db)):
                 "province": user.province,
                 "city": user.city,
                 "gender": user.gender,
-                "created_at": user.created_at.isoformat() if user.created_at else None
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+                "is_verified": user.is_verified if hasattr(user, 'is_verified') else False,
+                "verification_code": user.verification_code if hasattr(user, 'verification_code') else None
             })
         
         return {
@@ -636,7 +727,8 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
             province=user.province,
             city=user.city,
             gender=user.gender,
-            password=hashed_password
+            password=hashed_password,
+            is_verified=False
         )
         
         db.add(db_user)
@@ -656,7 +748,8 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
             province=db_user.province,
             city=db_user.city,
             gender=db_user.gender,
-            created_at=db_user.created_at
+            created_at=db_user.created_at,
+            is_verified=db_user.is_verified
         )
         
     except HTTPException:
@@ -1839,7 +1932,8 @@ async def startup_event():
                 province="تهران",
                 city="تهران",
                 gender="male",
-                password=get_password_hash("123456")
+                password=get_password_hash("123456"),
+                is_verified=False
             )
             db.add(test_user)
             db.commit()
@@ -1930,4 +2024,5 @@ if __name__ == "__main__":
     import uvicorn
     print("🚀 شروع سرویس Manareh API...")
     print(f"🎯 اتصال دیتابیس: {DATABASE_URL}")
+    print(f"📱 سرویس پیامکی کاوه‌نگار فعال است")
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
