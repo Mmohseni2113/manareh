@@ -2017,6 +2017,22 @@ async def startup_event():
     finally:
         db.close()
 
+# 🔥 Start Keep Alive (برای جلوگیری از خاموش شدن سرور Render)
+from threading import Thread
+import time
+import requests
+
+def keep_alive():
+    while True:
+        try:
+            requests.get("https://manareh.onrender.com")
+        except:
+            pass
+        time.sleep(240)  # هر 4 دقیقه یک بار
+
+Thread(target=keep_alive, daemon=True).start()
+# 🔥 End Keep Alive
+
 if __name__ == "__main__":
     import uvicorn
     print("🚀 شروع سرویس Manareh API...")
