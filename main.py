@@ -465,8 +465,7 @@ def create_access_token(data: dict):
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
+        detail="Could not validate credentials"
     )
     try:
         # اگر توکن خالی است، خطا نده و None برگردان
@@ -770,8 +769,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
             print("❌ کاربر یافت نشد")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="ایمیل یا رمز عبور اشتباه است",
-                headers={"WWW-Authenticate": "Bearer"},
+                detail="ایمیل یا رمز عبور اشتباه است"
             )
         
         print(f"🔍 کاربر پیدا شد: {user.email}")
@@ -780,8 +778,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
             print("❌ رمز عبور نادرست")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="ایمیل یا رمز عبور اشتباه است",
-                headers={"WWW-Authenticate": "Bearer"},
+                detail="ایمیل یا رمز عبور اشتباه است"
             )
         
         access_token = create_access_token(data={"sub": user.email})
@@ -1626,7 +1623,7 @@ async def get_user_events(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادهای کاربر")
 
 # اضافه کردن endpoint برای نوتیفیکیشن‌ها
-@app.get("/users/{user_id}/notifications", response_model=List[NotificationResponse])
+@app.get("/users/{user_id}/notifications", response_model=List[NotificationResponse)
 async def get_user_notifications(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         if current_user.id != user_id:
