@@ -85,17 +85,12 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 # Dependency Injection برای دیتابیس
-@contextmanager
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-
-def get_db_session():
-    with get_db() as db:
-        yield db
 
 # تنظیمات JWT - استفاده از متغیرهای محیطی
 SECRET_KEY = os.getenv("MANAREH_SECRET_KEY", "manareh-secret-key-2024-very-secure-key-here-change-in-production")
@@ -179,9 +174,9 @@ class UserFavorite(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 # تابع برای بررسی و ایجاد فیلدهای جدید
-async def check_and_create_missing_columns():
+def check_and_create_missing_columns():
     """بررسی و ایجاد فیلدهای جدید در جداول"""
-    db = next(get_db_session())
+    db = SessionLocal()
     try:
         inspector = inspect(engine)
         
@@ -280,13 +275,13 @@ async def check_and_create_missing_columns():
         db.close()
 
 # ایجاد جداول در دیتابیس
-async def create_tables():
+def create_tables():
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("جداول دیتابیس ایجاد شدند")
         
         # بررسی و ایجاد فیلدهای جدید
-        await check_and_create_missing_columns()
+        check_and_create_missing_columns()
         
     except Exception as e:
         logger.error(f"خطا در ایجاد جداول: {e}")
@@ -485,10 +480,10 @@ def create_access_token(data: dict):
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithms=[ALGORITHM])
     return encoded_jwt
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db_session)):
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials"
@@ -519,7 +514,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         raise credentials_exception
 
 # اضافه کردن dependency اختیاری برای کاربر جاری
-async def get_optional_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db_session)):
+async def get_optional_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
         return await get_current_user(token, db)
     except HTTPException:
@@ -571,7 +566,7 @@ sms_service = SMSService()
 
 # 📤 ارسال OTP - بهبود یافته
 @app.post("/send-otp", response_model=Dict[str, str])
-async def send_otp(req: OTPSendRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db_session)):
+async def send_otp(req: OTPSendRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
     ارسال کد تأیید به شماره تلفن کاربر
     """
@@ -620,7 +615,7 @@ async def send_verification_sms(phone_number: str, code: str):
 
 # ✔ تایید OTP - بهبود یافته
 @app.post("/verify-otp", response_model=OTPVerifyResponse)
-async def verify_otp(req: OTPVerifyRequest, db: Session = Depends(get_db_session)):
+async def verify_otp(req: OTPVerifyRequest, db: Session = Depends(get_db)):
     """
     تایید کد تأیید و فعال کردن حساب کاربری
     """
@@ -726,7 +721,7 @@ async def check_user_exists(
     email: str = Query(None),
     national_id: str = Query(None),
     phone: str = Query(None),
-    db: Session = Depends(get_db_session)
+    db: Session = Depends(get_db)
 ):
     try:
         exists = False
@@ -756,7 +751,7 @@ async def check_user_exists(
         return {"exists": False, "message": "خطا در بررسی کاربر"}
 
 @app.get("/debug/users")
-async def debug_users(db: Session = Depends(get_db_session)):
+async def debug_users(db: Session = Depends(get_db)):
     """endpoint برای دیباگ کاربران"""
     try:
         users = db.query(User).all()
@@ -790,7 +785,7 @@ async def debug_users(db: Session = Depends(get_db_session)):
         }
 
 @app.post("/users", response_model=UserResponse)
-async def create_user(user: UserCreate, db: Session = Depends(get_db_session)):
+async def create_user(user: UserCreate, db: Session = Depends(get_db)):
     try:
         logger.info(f"دریافت اطلاعات کاربر برای ثبت‌نام: {user.email}")
         
@@ -875,7 +870,7 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db_session)):
         raise HTTPException(status_code=500, detail=f"خطای سرور در ایجاد کاربر: {str(e)}")
 
 @app.post("/token", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db_session)):
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     try:
         logger.info(f"تلاش برای ورود کاربر: {form_data.username}")
         
@@ -912,7 +907,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
         raise HTTPException(status_code=500, detail="خطای سرور در ورود")
 
 @app.post("/login")
-async def login_debug(login_data: LoginRequest, db: Session = Depends(get_db_session)):
+async def login_debug(login_data: LoginRequest, db: Session = Depends(get_db)):
     try:
         logger.info(f"درخواست login جدید: {login_data.username}")
         
@@ -950,7 +945,7 @@ async def login_debug(login_data: LoginRequest, db: Session = Depends(get_db_ses
         )
 
 # بقیه endpointها بدون تغییر باقی می‌مانند...
-# فقط dependencyهایشان به get_db_session تغییر می‌کند
+# فقط dependencyهایشان به get_db تغییر می‌کند
 
 def generate_recurring_events(base_event: EventCreate, db: Session) -> List[Event]:
     events = []
@@ -1063,7 +1058,7 @@ def generate_recurring_events(base_event: EventCreate, db: Session) -> List[Even
     return events
 
 @app.post("/events", response_model=EventResponse)
-async def create_event(event: EventCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db_session)):
+async def create_event(event: EventCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         logger.info(f"دریافت درخواست ایجاد رویداد از کاربر: {current_user.email if current_user else 'Anonymous'}")
         
@@ -1120,7 +1115,7 @@ async def create_event(event: EventCreate, current_user: User = Depends(get_curr
         raise HTTPException(status_code=500, detail="خطای سرور در ایجاد رویداد")
 
 @app.get("/events", response_model=List[EventResponse])
-async def get_events(current_user: User = Depends(get_current_user), db: Session = Depends(get_db_session)):
+async def get_events(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         logger.info(f"دریافت درخواست لیست رویدادها از کاربر: {current_user.email if current_user else 'Anonymous'}")
         events = db.query(Event).all()
@@ -1173,14 +1168,11 @@ async def get_events(current_user: User = Depends(get_current_user), db: Session
         logger.error(f"خطا در دریافت رویدادها: {e}")
         raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادها")
 
-# بقیه endpointها به همین صورت ادامه دارند...
-# فقط dependencyهایشان به get_db_session تغییر می‌کند
-
 # اضافه کردن endpoint جدید برای events/optimized
 @app.get("/events/optimized", response_model=List[EventResponse])
 async def get_events_optimized(
     current_user: Optional[User] = Depends(get_optional_current_user), 
-    db: Session = Depends(get_db_session)
+    db: Session = Depends(get_db)
 ):
     """Endpoint جدید برای دریافت بهینه‌شده رویدادها"""
     try:
@@ -1237,7 +1229,7 @@ async def get_events_optimized(
         raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادها")
 
 @app.get("/events/public", response_model=List[EventResponse])
-async def get_public_events(db: Session = Depends(get_db_session)):
+async def get_public_events(db: Session = Depends(get_db)):
     try:
         logger.info("دریافت درخواست لیست رویدادهای عمومی")
         events = db.query(Event).all()
@@ -1281,10 +1273,8 @@ async def get_public_events(db: Session = Depends(get_db_session)):
         logger.error(f"خطا در دریافت رویدادهای عمومی: {e}")
         raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادها")
 
-# بقیه endpointها به همین ترتیب ادامه دارند...
-
 @app.put("/events/{event_id}/update-fields")
-async def update_event_fields(event_id: int, db: Session = Depends(get_db_session)):
+async def update_event_fields(event_id: int, db: Session = Depends(get_db)):
     try:
         db_event = db.query(Event).filter(Event.id == event_id).first()
         if not db_event:
@@ -1320,7 +1310,7 @@ async def update_event_fields(event_id: int, db: Session = Depends(get_db_sessio
         raise HTTPException(status_code=500, detail="خطای سرور در به‌روزرسانی رویداد")
 
 @app.get("/users/{user_id}", response_model=UserResponse)
-async def get_user(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db_session)):
+async def get_user(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
@@ -1331,7 +1321,7 @@ async def get_user(user_id: int, current_user: User = Depends(get_current_user),
         raise HTTPException(status_code=500, detail="خطای سرور در دریافت اطلاعات کاربر")
 
 @app.get("/users/me", response_model=UserResponse)
-async def get_current_user_info(current_user: User = Depends(get_current_user), db: Session = Depends(get_db_session)):
+async def get_current_user_info(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         return current_user
     except Exception as e:
@@ -1343,7 +1333,7 @@ async def get_current_user_info(current_user: User = Depends(get_current_user), 
 async def get_user_stats(
     user_id: int, 
     current_user: Optional[User] = Depends(get_optional_current_user), 
-    db: Session = Depends(get_db_session)
+    db: Session = Depends(get_db)
 ):
     """دریافت آمار کاربر با پشتیبانی از کاربران مهمان"""
     try:
@@ -1388,7 +1378,7 @@ async def get_user_stats(
 
 # اضافه کردن endpoint عمومی برای آمار کاربر
 @app.get("/users/{user_id}/stats/public")
-async def get_user_stats_public(user_id: int, db: Session = Depends(get_db_session)):
+async def get_user_stats_public(user_id: int, db: Session = Depends(get_db)):
     """Endpoint عمومی برای دریافت آمار کاربر (بدون نیاز به احراز هویت)"""
     try:
         user = db.query(User).filter(User.id == user_id).first()
@@ -1439,7 +1429,7 @@ async def check_auth(current_user: User = Depends(get_current_user)):
 # بقیه endpointها...
 
 @app.post("/comments", response_model=CommentResponse)
-async def create_comment(comment: CommentCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db_session)):
+async def create_comment(comment: CommentCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         logger.info(f"دریافت نظر جدید برای رویداد {comment.event_id}")
         
@@ -1494,7 +1484,7 @@ async def create_comment(comment: CommentCreate, current_user: User = Depends(ge
         raise HTTPException(status_code=500, detail="خطای سرور در ثبت نظر")
 
 @app.get("/comments/{event_id}", response_model=List[CommentResponse])
-async def get_comments(event_id: int, db: Session = Depends(get_db_session)):
+async def get_comments(event_id: int, db: Session = Depends(get_db)):
     try:
         logger.info(f"دریافت نظرات برای رویداد {event_id}")
         
@@ -1524,7 +1514,7 @@ async def get_comments(event_id: int, db: Session = Depends(get_db_session)):
         raise HTTPException(status_code=500, detail="خطای سرور در دریافت نظرات")
 
 @app.post("/events/{event_id}/register")
-async def register_for_event(event_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db_session)):
+async def register_for_event(event_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         logger.info(f"ثبت‌نام کاربر {current_user.id} برای رویداد {event_id}")
         
@@ -1573,7 +1563,7 @@ async def register_for_event(event_id: int, current_user: User = Depends(get_cur
 
 # اضافه کردن endpoint جدید برای حذف ثبت‌نام از رویداد
 @app.delete("/events/{event_id}/unregister")
-async def unregister_from_event(event_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db_session)):
+async def unregister_from_event(event_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         logger.info(f"حذف ثبت‌نام کاربر {current_user.id} از رویداد {event_id}")
         
@@ -1614,7 +1604,7 @@ async def unregister_from_event(event_id: int, current_user: User = Depends(get_
 
 # اضافه کردن endpoint جدید برای دریافت رویدادهای ثبت‌نام شده کاربر
 @app.get("/users/{user_id}/registered-events")
-async def get_user_registered_events(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db_session)):
+async def get_user_registered_events(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         logger.info(f"دریافت رویدادهای ثبت‌نام شده کاربر {user_id}")
         
@@ -1670,7 +1660,7 @@ async def get_user_registered_events(user_id: int, current_user: User = Depends(
         raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادهای ثبت‌نام شده")
 
 @app.get("/events/{event_id}/participants", response_model=List[EventParticipantResponse])
-async def get_event_participants(event_id: int, db: Session = Depends(get_db_session)):
+async def get_event_participants(event_id: int, db: Session = Depends(get_db)):
     try:
         logger.info(f"دریافت لیست شرکت‌کنندگان رویداد {event_id}")
         
@@ -1699,7 +1689,7 @@ async def get_event_participants(event_id: int, db: Session = Depends(get_db_ses
         raise HTTPException(status_code=500, detail="خطای سرور در دریافت شرکت‌کنندگان")
 
 @app.get("/users/{user_id}/events")
-async def get_user_events(user_id: int, db: Session = Depends(get_db_session)):
+async def get_user_events(user_id: int, db: Session = Depends(get_db)):
     try:
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
@@ -1747,7 +1737,7 @@ async def get_user_events(user_id: int, db: Session = Depends(get_db_session)):
 
 # اضافه کردن endpoint برای نوتیفیکیشن‌ها
 @app.get("/users/{user_id}/notifications", response_model=List[NotificationResponse])
-async def get_user_notifications(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db_session)):
+async def get_user_notifications(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         if current_user.id != user_id:
             raise HTTPException(status_code=403, detail="دسترسی غیرمجاز")
@@ -1759,7 +1749,7 @@ async def get_user_notifications(user_id: int, current_user: User = Depends(get_
         raise HTTPException(status_code=500, detail="خطای سرور در دریافت نوتیفیکیشن‌ها")
 
 @app.get("/users/{user_id}/notifications/unread-count")
-async def get_unread_notifications_count(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db_session)):
+async def get_unread_notifications_count(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         if current_user.id != user_id:
             raise HTTPException(status_code=403, detail="دسترسی غیرمجاز")
@@ -1775,7 +1765,7 @@ async def get_unread_notifications_count(user_id: int, current_user: User = Depe
         raise HTTPException(status_code=500, detail="خطای سرور در دریافت تعداد نوتیفیکیشن‌ها")
 
 @app.put("/notifications/{notification_id}/mark-read")
-async def mark_notification_read(notification_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db_session)):
+async def mark_notification_read(notification_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         notification = db.query(Notification).filter(Notification.id == notification_id).first()
         if not notification:
@@ -1794,7 +1784,7 @@ async def mark_notification_read(notification_id: int, current_user: User = Depe
         raise HTTPException(status_code=500, detail="خطای سرور در به‌روزرسانی نوتیفیکیشن")
 
 @app.put("/users/{user_id}/notifications/mark-all-read")
-async def mark_all_notifications_read(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db_session)):
+async def mark_all_notifications_read(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         if current_user.id != user_id:
             raise HTTPException(status_code=403, detail="دسترسی غیرمجاز")
@@ -1814,7 +1804,7 @@ async def mark_all_notifications_read(user_id: int, current_user: User = Depends
 
 # اضافه کردن endpoint برای علاقه‌مندی‌ها
 @app.post("/favorites", response_model=FavoriteResponse)
-async def add_to_favorites(favorite: FavoriteCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db_session)):
+async def add_to_favorites(favorite: FavoriteCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         logger.info(f"افزودن رویداد {favorite.event_id} به علاقه‌مندی‌های کاربر {favorite.user_id}")
         
@@ -1857,7 +1847,7 @@ async def add_to_favorites(favorite: FavoriteCreate, current_user: User = Depend
         raise HTTPException(status_code=500, detail="خطای سرور در افزودن به علاقه‌مندی‌ها")
 
 @app.delete("/favorites/{user_id}/{event_id}")
-async def remove_from_favorites(user_id: int, event_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db_session)):
+async def remove_from_favorites(user_id: int, event_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         logger.info(f"حذف رویداد {event_id} از علاقه‌مندی‌های کاربر {user_id}")
         
@@ -1886,7 +1876,7 @@ async def remove_from_favorites(user_id: int, event_id: int, current_user: User 
         raise HTTPException(status_code=500, detail="خطای سرور در حذف از علاقه‌مندی‌ها")
 
 @app.get("/users/{user_id}/favorites", response_model=List[EventResponse])
-async def get_user_favorites(user_id: int, db: Session = Depends(get_db_session)):
+async def get_user_favorites(user_id: int, db: Session = Depends(get_db)):
     try:
         logger.info(f"دریافت علاقه‌مندی‌های کاربر {user_id}")
         
@@ -1987,7 +1977,7 @@ async def options_route(path: str):
     return JSONResponse(content={"status": "ok"})
 
 @app.get("/test-db")
-async def test_db(db: Session = Depends(get_db_session)):
+async def test_db(db: Session = Depends(get_db)):
     try:
         users_count = db.query(User).count()
         events_count = db.query(Event).count()
@@ -2042,10 +2032,10 @@ async def startup_event():
         logger.info("🚀 شروع سرویس Manareh API...")
         
         # ایجاد جداول دیتابیس
-        await create_tables()
+        create_tables()
         
         # بررسی اتصال دیتابیس
-        db = next(get_db_session())
+        db = SessionLocal()
         users_count = db.query(User).count()
         logger.info(f"👥 تعداد کاربران در دیتابیس: {users_count}")
         
