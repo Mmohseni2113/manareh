@@ -555,7 +555,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# سرویس ارسال پیامک - بهبود یافته
+# سرویس ارسال پیامک
 class SMSService:
     def __init__(self):
         self.api_key = KAVENEGAR_API_KEY
@@ -565,13 +565,6 @@ class SMSService:
         ارسال کد تأیید به شماره تلفن
         """
         try:
-            logger.info(f"تلاش برای ارسال پیامک به {phone_number} با کد {code}")
-            
-            # اگر API_KEY تستی است، لاگ کن و موفق برگردان
-            if self.api_key == "6A6F54654839584E356A6633743272783851717A6C7663667477615357533163595267372B68446636426B3D":
-                logger.info(f"پیامک تستی - کد {code} برای شماره {phone_number}")
-                return True
-                
             api = KavenegarAPI(self.api_key)
             params = {
                 'sender': '2000660110',
@@ -609,7 +602,7 @@ async def check_duplicate_user(email: str, national_id: str, phone_number: str, 
 
 # 📝 ثبت‌نام مرحله اول - فقط ذخیره اطلاعات بدون تأیید
 @app.post("/signup-step1", response_model=SignupStep1Response)
-async def signup_step1(user: SignupStep1Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+async def signup_step1(user: SignupStep1Request, db: Session = Depends(get_db)):
     """
     مرحله اول ثبت‌نام - ذخیره اطلاعات کاربر و ارسال کد تأیید
     """
@@ -654,10 +647,6 @@ async def signup_step1(user: SignupStep1Request, background_tasks: BackgroundTas
         
         hashed_password = get_password_hash(user.password)
         
-        # تولید کد تأیید
-        verification_code = str(random.randint(10000, 99999))  # کد ۵ رقمی
-        code_expire_time = datetime.utcnow() + timedelta(minutes=2)  # ۲ دقیقه اعتبار
-        
         # ایجاد کاربر جدید با وضعیت تأیید نشده
         db_user = User(
             first_name=user.first_name,
@@ -671,8 +660,8 @@ async def signup_step1(user: SignupStep1Request, background_tasks: BackgroundTas
             gender=user.gender,
             password=hashed_password,
             is_verified=False,  # کاربر در ابتدا تایید نشده است
-            verification_code=verification_code,
-            code_expire_time=code_expire_time
+            verification_code=None,
+            code_expire_time=None
         )
         
         db.add(db_user)
@@ -680,13 +669,9 @@ async def signup_step1(user: SignupStep1Request, background_tasks: BackgroundTas
         db.refresh(db_user)
         
         logger.info(f"اطلاعات کاربر با موفقیت ذخیره شد (آماده تأیید): {db_user.id} - {db_user.email}")
-        logger.info(f"کد تأیید تولید شده: {verification_code}")
-        
-        # ارسال پیامک در background - استفاده مستقیم از sms_service
-        background_tasks.add_task(send_verification_sms_task, user.phone_number, verification_code)
         
         return SignupStep1Response(
-            message="اطلاعات شما با موفقیت ثبت شد. کد تأیید به شماره تلفن شما ارسال شد.",
+            message="اطلاعات شما با موفقیت ثبت شد. لطفاً شماره تلفن خود را تأیید کنید.",
             email=db_user.email,
             phone_number=db_user.phone_number,
             requires_verification=True
@@ -700,20 +685,6 @@ async def signup_step1(user: SignupStep1Request, background_tasks: BackgroundTas
         logger.error(f"خطا در ثبت‌نام مرحله اول: {str(e)}")
         raise HTTPException(status_code=500, detail=f"خطای سرور در ثبت‌نام: {str(e)}")
 
-# تابع برای ارسال پیامک در background
-async def send_verification_sms_task(phone_number: str, code: str):
-    """
-    تابع برای ارسال پیامک تأیید در background
-    """
-    try:
-        success = await sms_service.send_verification_code(phone_number, code)
-        if success:
-            logger.info(f"پیامک با موفقیت به {phone_number} ارسال شد")
-        else:
-            logger.warning(f"ارسال پیامک به {phone_number} ناموفق بود")
-    except Exception as e:
-        logger.error(f"خطا در ارسال پیامک: {e}")
-
 # 📤 ارسال OTP - بهبود یافته
 @app.post("/send-otp", response_model=Dict[str, str])
 async def send_otp(req: OTPSendRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
@@ -726,17 +697,20 @@ async def send_otp(req: OTPSendRequest, background_tasks: BackgroundTasks, db: S
         # بررسی وجود کاربر
         user = db.query(User).filter(User.email == req.email).first()
         if not user:
+            logger.warning(f"کاربر با ایمیل {req.email} یافت نشد")
             raise HTTPException(status_code=404, detail="کاربر یافت نشد")
         
         # بررسی تطابق شماره تلفن
         if user.phone_number != req.phone_number:
+            logger.warning(f"شماره تلفن {req.phone_number} با ایمیل {req.email} مطابقت ندارد")
             raise HTTPException(status_code=400, detail="شماره تلفن با ایمیل مطابقت ندارد")
         
         # بررسی اینکه آیا کاربر قبلاً تایید شده
         if user.is_verified:
+            logger.info(f"کاربر {req.email} قبلاً تایید شده است")
             raise HTTPException(status_code=400, detail="حساب کاربری شما قبلاً تایید شده است")
         
-        # تولید کد تصادفی جدید
+        # تولید کد تصادفی
         code = str(random.randint(10000, 99999))  # کد ۵ رقمی
         
         # ذخیره کد در دیتابیس با زمان انقضا
@@ -746,16 +720,25 @@ async def send_otp(req: OTPSendRequest, background_tasks: BackgroundTasks, db: S
         
         logger.info(f"کد تأیید {code} برای کاربر {user.email} تولید شد")
         
-        # ارسال پیامک در background - استفاده مستقیم از sms_service
-        background_tasks.add_task(send_verification_sms_task, req.phone_number, code)
+        # ارسال پیامک در background
+        background_tasks.add_task(send_verification_sms, req.phone_number, code)
         
         return {"message": "کد تأیید ارسال شد", "debug_code": code}  # فقط برای دیباگ
         
-    except HTTPException:
-        raise
+    except HTTPException as he:
+        logger.error(f"HTTPException در ارسال OTP: {he.detail}")
+        raise he
     except Exception as e:
-        logger.error(f"خطا در ارسال OTP: {e}")
+        logger.error(f"خطا در ارسال OTP: {str(e)}")
         raise HTTPException(status_code=500, detail="خطای سرور در ارسال کد تأیید")
+
+async def send_verification_sms(phone_number: str, code: str):
+    """
+    تابع برای ارسال پیامک تأیید
+    """
+    success = await sms_service.send_verification_code(phone_number, code)
+    if not success:
+        logger.warning(f"ارسال پیامک به {phone_number} ناموفق بود، اما کد در سیستم ذخیره شد")
 
 # ✔ تایید OTP و تکمیل ثبت‌نام - بهبود یافته
 @app.post("/verify-otp", response_model=OTPVerifyResponse)
@@ -764,8 +747,6 @@ async def verify_otp(req: OTPVerifyRequest, db: Session = Depends(get_db)):
     تایید کد تأیید و فعال کردن حساب کاربری
     """
     try:
-        logger.info(f"درخواست تأیید OTP برای ایمیل: {req.email} با کد: {req.code}")
-        
         user = db.query(User).filter(User.email == req.email).first()
 
         if not user:
@@ -899,8 +880,7 @@ async def debug_users(db: Session = Depends(get_db)):
                 "gender": user.gender,
                 "created_at": user.created_at.isoformat() if user.created_at else None,
                 "is_verified": user.is_verified if hasattr(user, 'is_verified') else False,
-                "verification_code": user.verification_code if hasattr(user, 'verification_code') else None,
-                "code_expire_time": user.code_expire_time.isoformat() if user.code_expire_time else None
+                "verification_code": user.verification_code if hasattr(user, 'verification_code') else None
             })
         
         return {
@@ -916,7 +896,7 @@ async def debug_users(db: Session = Depends(get_db)):
 
 # 📝 ثبت‌نام قدیمی - برای سازگاری با کد موجود (استفاده از signup-step1 جدید)
 @app.post("/users", response_model=UserResponse)
-async def create_user(user: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+async def create_user(user: UserCreate, db: Session = Depends(get_db)):
     """
     ثبت‌نام قدیمی - فقط برای سازگاری
     در حال حاضر از /signup-step1 و /verify-otp استفاده کنید
@@ -925,7 +905,7 @@ async def create_user(user: UserCreate, background_tasks: BackgroundTasks, db: S
         logger.info(f"دریافت اطلاعات کاربر برای ثبت‌نام قدیمی: {user.email}")
         
         # استفاده از منطق جدید
-        signup_response = await signup_step1(SignupStep1Request(**user.dict()), background_tasks, db)
+        signup_response = await signup_step1(SignupStep1Request(**user.dict()), db)
         
         # پیدا کردن کاربر ایجاد شده
         db_user = db.query(User).filter(User.email == user.email).first()
@@ -2214,5 +2194,4 @@ async def startup_event():
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
