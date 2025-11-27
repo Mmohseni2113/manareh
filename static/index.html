@@ -3482,9 +3482,9 @@
                         <input id="agree" type="checkbox"> با <a href="#" style="color: var(--accent-1); text-decoration: none;">قوانین و محرمانگی</a> موافقم
                     </label>
                     <div class="button-group">
-                        <button class="glass-button primary" id="signupSubmitBtn" type="button">
-                            <span id="btnIcon">🟢</span>
-                            <span id="btnText">ثبت نام</span>
+                        <button class="glass-button primary" id="signupSubmitBtn" type="button" disabled>
+                            <span id="btnIcon">⏳</span>
+                            <span id="btnText">تأیید شماره تلفن الزامی است</span>
                         </button>
                         <button class="glass-button" type="button" onclick="showTab('login')">وارد شوید</button>
                     </div>
@@ -4481,11 +4481,13 @@
             }
         };
 
-        // مدیریت OTP
+        // مدیریت OTP - سیستم جدید
         const OTPManager = {
             timer: null,
             timeLeft: 120,
             currentEmail: '',
+            currentPhone: '',
+            isPhoneVerified: false,
             
             initialize() {
                 console.log("📱 راه‌اندازی مدیریت OTP");
@@ -4522,20 +4524,31 @@
                     });
                 });
                 
+                // فعال کردن بخش تأیید شماره هنگام پر کردن فرم
+                document.getElementById('signupPhone').addEventListener('blur', this.checkPhoneVerification.bind(this));
+                
                 console.log("✅ مدیریت OTP راه‌اندازی شد");
+            },
+            
+            checkPhoneVerification() {
+                const phone = document.getElementById('signupPhone').value;
+                const email = document.getElementById('signupEmail').value;
+                
+                if (phone && email && phone.length === 11 && phone.startsWith('09')) {
+                    document.getElementById('phoneVerification').style.display = 'block';
+                    document.getElementById('displayPhoneNumber').textContent = phone;
+                    this.currentPhone = phone;
+                    this.currentEmail = email;
+                }
             },
             
             async sendOTP() {
                 console.log("📤 ارسال کد OTP");
-                const phoneNumber = document.getElementById('signupPhone').value;
-                const email = document.getElementById('signupEmail').value;
                 
-                if (!phoneNumber || !email) {
-                    showModal('خطا', 'لطفاً شماره تلفن و ایمیل را وارد کنید.', 'error');
+                if (!this.currentPhone || !this.currentEmail) {
+                    showModal('خطا', 'لطفاً شماره تلفن و ایمیل را به درستی وارد کنید.', 'error');
                     return;
                 }
-                
-                this.currentEmail = email;
                 
                 try {
                     const response = await fetch(`${API_BASE_URL}/send-otp`, {
@@ -4544,8 +4557,8 @@
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
-                            phone_number: phoneNumber,
-                            email: email
+                            phone_number: this.currentPhone,
+                            email: this.currentEmail
                         })
                     });
                     
@@ -4617,6 +4630,9 @@
                         
                         // فعال کردن دکمه ثبت‌نام
                         document.getElementById('signupSubmitBtn').disabled = false;
+                        document.getElementById('signupSubmitBtn').innerHTML = '<span id="btnIcon">🟢</span><span id="btnText">ثبت نام</span>';
+                        
+                        this.isPhoneVerified = true;
                         
                         // ذخیره توکن اگر وجود دارد
                         if (result.access_token) {
@@ -5874,9 +5890,15 @@
             }
         }
 
-        // تابع ثبت‌نام
+        // تابع ثبت‌نام جدید - با تأیید شماره تلفن
         async function signup() {
             console.log("📝 شروع فرآیند ثبت‌نام");
+            
+            // بررسی اینکه آیا شماره تلفن تأیید شده است
+            if (!OTPManager.isPhoneVerified) {
+                showModal('خطا', 'لطفاً ابتدا شماره تلفن خود را تأیید کنید.', 'error');
+                return;
+            }
             
             const formData = {
                 first_name: document.getElementById('signupFirstName').value,
@@ -5912,7 +5934,8 @@
             try {
                 console.log("📤 ارسال درخواست ثبت‌نام به سرور");
                 
-                const response = await fetch(`${API_BASE_URL}/users`, {
+                // استفاده از endpoint جدید signup-step1
+                const response = await fetch(`${API_BASE_URL}/signup-step1`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -5921,17 +5944,15 @@
                 });
                 
                 if (response.ok) {
-                    const userData = await response.json();
-                    console.log("✅ ثبت‌نام موفق:", userData);
+                    const result = await response.json();
+                    console.log("✅ ثبت‌نام مرحله اول موفق:", result);
                     
-                    showModal('موفقیت', 'ثبت‌نام با موفقیت انجام شد. لطفاً شماره تلفن خود را تأیید کنید.', 'success');
+                    showModal('موفقیت', 'ثبت‌نام با موفقیت انجام شد. اکنون می‌توانید وارد شوید.', 'success');
                     
-                    // نمایش بخش تأیید شماره تلفن
-                    document.getElementById('phoneVerification').style.display = 'block';
-                    document.getElementById('displayPhoneNumber').textContent = formData.phone_number;
-                    
-                    // غیرفعال کردن دکمه ثبت‌نام اصلی
-                    document.getElementById('signupSubmitBtn').disabled = true;
+                    setTimeout(() => {
+                        hideModal();
+                        showTab('login');
+                    }, 2000);
                     
                 } else {
                     const errorData = await response.json();
