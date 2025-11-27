@@ -448,7 +448,6 @@ class FavoriteResponse(BaseModel):
 
 # مدل‌های جدید برای OTP
 class OTPSendRequest(BaseModel):
-    phone_number: str
     email: str
 
 class OTPVerifyRequest(BaseModel):
@@ -536,30 +535,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# سرویس ارسال پیامک
+# سرویس ارسال پیامک - بهبود یافته
 class SMSService:
     def __init__(self):
         self.api_key = KAVENEGAR_API_KEY
     
     async def send_verification_code(self, phone_number: str, code: str) -> bool:
         """
-        ارسال کد تأیید به شماره تلفن
+        ارسال کد تأیید به شماره تلفن با استفاده از کاوه‌نگار
         """
         try:
+            logger.info(f"تلاش برای ارسال پیامک به {phone_number} با کد {code}")
+            
+            # استفاده از API کاوه‌نگار
             api = KavenegarAPI(self.api_key)
             params = {
-                'sender': '2000660110',
+                'sender': '2000660110',  # شماره سرویس‌دهنده
                 'receptor': phone_number,
                 'message': f'کد تایید مناره: {code}\nاین کد به مدت ۲ دقیقه معتبر است.'
             }
             response = api.sms_send(params)
-            logger.info(f"پیامک ارسال شد به {phone_number}: {response}")
+            logger.info(f"پیامک با موفقیت ارسال شد به {phone_number}: {response}")
             return True
+            
         except APIException as e:
-            logger.error(f"خطای API در ارسال پیامک به {phone_number}: {e}")
+            logger.error(f"خطای API کاوه‌نگار در ارسال پیامک به {phone_number}: {e}")
+            # در صورت خطا، لاگ می‌کنیم اما اجازه می‌دهیم فرآیند ادامه یابد
             return False
         except Exception as e:
             logger.error(f"خطای ناشناخته در ارسال پیامک به {phone_number}: {e}")
+            # در حالت توسعه، اجازه می‌دهیم ادامه یابد
             return False
 
 sms_service = SMSService()
@@ -568,17 +573,15 @@ sms_service = SMSService()
 @app.post("/send-otp", response_model=Dict[str, str])
 async def send_otp(req: OTPSendRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
-    ارسال کد تأیید به شماره تلفن کاربر
+    ارسال کد تأیید به شماره تلفن کاربر پس از ثبت‌نام اولیه
     """
     try:
+        logger.info(f"درخواست ارسال OTP برای ایمیل: {req.email}")
+        
         # بررسی وجود کاربر
         user = db.query(User).filter(User.email == req.email).first()
         if not user:
-            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
-        
-        # بررسی تطابق شماره تلفن
-        if user.phone_number != req.phone_number:
-            raise HTTPException(status_code=400, detail="شماره تلفن با ایمیل مطابقت ندارد")
+            raise HTTPException(status_code=404, detail="کاربر یافت نشد. لطفاً ابتدا ثبت‌نام کنید.")
         
         # بررسی اینکه آیا کاربر قبلاً تایید شده
         if user.is_verified:
@@ -595,9 +598,13 @@ async def send_otp(req: OTPSendRequest, background_tasks: BackgroundTasks, db: S
         logger.info(f"کد تأیید {code} برای کاربر {user.email} تولید شد")
         
         # ارسال پیامک در background
-        background_tasks.add_task(send_verification_sms, req.phone_number, code)
+        background_tasks.add_task(send_verification_sms, user.phone_number, code)
         
-        return {"message": "کد تأیید ارسال شد", "debug_code": code}  # فقط برای دیباگ
+        return {
+            "message": "کد تأیید ارسال شد", 
+            "debug_code": code,  # فقط برای دیباگ - در تولید حذف شود
+            "phone_number": user.phone_number[-4:]  # ۴ رقم آخر شماره برای نمایش
+        }
         
     except HTTPException:
         raise
@@ -610,7 +617,9 @@ async def send_verification_sms(phone_number: str, code: str):
     تابع برای ارسال پیامک تأیید
     """
     success = await sms_service.send_verification_code(phone_number, code)
-    if not success:
+    if success:
+        logger.info(f"پیامک تأیید با موفقیت به {phone_number} ارسال شد")
+    else:
         logger.warning(f"ارسال پیامک به {phone_number} ناموفق بود، اما کد در سیستم ذخیره شد")
 
 # ✔ تایید OTP - بهبود یافته
@@ -620,6 +629,8 @@ async def verify_otp(req: OTPVerifyRequest, db: Session = Depends(get_db)):
     تایید کد تأیید و فعال کردن حساب کاربری
     """
     try:
+        logger.info(f"درخواست تأیید OTP برای ایمیل: {req.email}")
+        
         user = db.query(User).filter(User.email == req.email).first()
 
         if not user:
@@ -786,6 +797,9 @@ async def debug_users(db: Session = Depends(get_db)):
 
 @app.post("/users", response_model=UserResponse)
 async def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    """
+    ایجاد کاربر جدید - ثبت‌نام اولیه (بدون تأیید)
+    """
     try:
         logger.info(f"دریافت اطلاعات کاربر برای ثبت‌نام: {user.email}")
         
@@ -826,6 +840,7 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
         
         hashed_password = get_password_hash(user.password)
         
+        # ایجاد کاربر جدید - در ابتدا تأیید نشده
         db_user = User(
             first_name=user.first_name,
             last_name=user.last_name,
@@ -837,14 +852,16 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
             city=user.city,
             gender=user.gender,
             password=hashed_password,
-            is_verified=False  # کاربر در ابتدا تایید نشده است
+            is_verified=False,  # کاربر در ابتدا تایید نشده است
+            verification_code=None,  # کد بعداً تولید می‌شود
+            code_expire_time=None
         )
         
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
         
-        logger.info(f"کاربر با موفقیت ایجاد شد: {db_user.id} - {db_user.email}")
+        logger.info(f"کاربر با موفقیت ایجاد شد (تأیید نشده): {db_user.id} - {db_user.email}")
         
         return UserResponse(
             id=db_user.id,
