@@ -461,6 +461,25 @@ class OTPVerifyResponse(BaseModel):
     token_type: Optional[str] = None
     user_id: Optional[int] = None
 
+# مدل جدید برای ثبت‌نام مرحله اول
+class SignupStep1Request(BaseModel):
+    first_name: str
+    last_name: str
+    email: str
+    national_id: str
+    phone_number: str
+    country: str
+    province: str
+    city: str
+    gender: str
+    password: str
+
+class SignupStep1Response(BaseModel):
+    message: str
+    email: str
+    phone_number: str
+    requires_verification: bool = True
+
 # توابع کمکی برای هش کردن رمز عبور
 def get_password_hash(password: str) -> str:
     """هش ساده رمز عبور با SHA-256 + salt"""
@@ -564,6 +583,108 @@ class SMSService:
 
 sms_service = SMSService()
 
+# بررسی تکراری بودن ایمیل و شماره تلفن
+async def check_duplicate_user(email: str, national_id: str, phone_number: str, db: Session) -> None:
+    """
+    بررسی تکراری بودن ایمیل، کد ملی و شماره تلفن
+    """
+    existing_user = db.query(User).filter(User.email == email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="این ایمیل قبلاً ثبت شده است")
+    
+    existing_national = db.query(User).filter(User.national_id == national_id).first()
+    if existing_national:
+        raise HTTPException(status_code=400, detail="این کد ملی قبلاً ثبت شده است")
+    
+    existing_phone = db.query(User).filter(User.phone_number == phone_number).first()
+    if existing_phone:
+        raise HTTPException(status_code=400, detail="این شماره تلفن قبلاً ثبت شده است")
+
+# 📝 ثبت‌نام مرحله اول - فقط ذخیره اطلاعات بدون تأیید
+@app.post("/signup-step1", response_model=SignupStep1Response)
+async def signup_step1(user: SignupStep1Request, db: Session = Depends(get_db)):
+    """
+    مرحله اول ثبت‌نام - ذخیره اطلاعات کاربر و ارسال کد تأیید
+    """
+    try:
+        logger.info(f"دریافت اطلاعات کاربر برای ثبت‌نام مرحله اول: {user.email}")
+        
+        # اعتبارسنجی فیلدهای الزامی
+        required_fields = {
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "national_id": user.national_id,
+            "phone_number": user.phone_number,
+            "country": user.country,
+            "province": user.province,
+            "city": user.city,
+            "gender": user.gender,
+            "password": user.password
+        }
+        
+        missing_fields = [field for field, value in required_fields.items() if not value]
+        if missing_fields:
+            raise HTTPException(status_code=400, detail=f"فیلدهای زیر الزامی هستند: {', '.join(missing_fields)}")
+        
+        if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", user.email):
+            raise HTTPException(status_code=400, detail="فرمت ایمیل نامعتبر است")
+        
+        # بررسی تکراری بودن اطلاعات
+        await check_duplicate_user(user.email, user.national_id, user.phone_number, db)
+        
+        if not user.national_id.isdigit() or len(user.national_id) != 10:
+            raise HTTPException(status_code=400, detail="کد ملی باید 10 رقم باشد")
+        
+        if not user.phone_number.startswith("09") or len(user.phone_number) != 11 or not user.phone_number.isdigit():
+            raise HTTPException(status_code=400, detail="شماره تلفن باید 11 رقم و با 09 شروع شود")
+        
+        if len(user.password) < 6:
+            raise HTTPException(status_code=400, detail="رمز عبور باید حداقل 6 کاراکتر باشد")
+        
+        if user.gender not in ['male', 'female']:
+            raise HTTPException(status_code=400, detail="جنسیت باید مرد یا زن باشد")
+        
+        hashed_password = get_password_hash(user.password)
+        
+        # ایجاد کاربر جدید با وضعیت تأیید نشده
+        db_user = User(
+            first_name=user.first_name,
+            last_name=user.last_name,
+            email=user.email,
+            national_id=user.national_id,
+            phone_number=user.phone_number,
+            country=user.country,
+            province=user.province,
+            city=user.city,
+            gender=user.gender,
+            password=hashed_password,
+            is_verified=False,  # کاربر در ابتدا تایید نشده است
+            verification_code=None,
+            code_expire_time=None
+        )
+        
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+        
+        logger.info(f"اطلاعات کاربر با موفقیت ذخیره شد (آماده تأیید): {db_user.id} - {db_user.email}")
+        
+        return SignupStep1Response(
+            message="اطلاعات شما با موفقیت ثبت شد. لطفاً شماره تلفن خود را تأیید کنید.",
+            email=db_user.email,
+            phone_number=db_user.phone_number,
+            requires_verification=True
+        )
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"خطا در ثبت‌نام مرحله اول: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"خطای سرور در ثبت‌نام: {str(e)}")
+
 # 📤 ارسال OTP - بهبود یافته
 @app.post("/send-otp", response_model=Dict[str, str])
 async def send_otp(req: OTPSendRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
@@ -613,7 +734,7 @@ async def send_verification_sms(phone_number: str, code: str):
     if not success:
         logger.warning(f"ارسال پیامک به {phone_number} ناموفق بود، اما کد در سیستم ذخیره شد")
 
-# ✔ تایید OTP - بهبود یافته
+# ✔ تایید OTP و تکمیل ثبت‌نام - بهبود یافته
 @app.post("/verify-otp", response_model=OTPVerifyResponse)
 async def verify_otp(req: OTPVerifyRequest, db: Session = Depends(get_db)):
     """
@@ -664,23 +785,6 @@ async def verify_otp(req: OTPVerifyRequest, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"خطا در تایید OTP: {e}")
         raise HTTPException(status_code=500, detail="خطای سرور در تایید کد")
-
-# بررسی تکراری بودن ایمیل و شماره تلفن
-async def check_duplicate_user(email: str, national_id: str, phone_number: str, db: Session) -> None:
-    """
-    بررسی تکراری بودن ایمیل، کد ملی و شماره تلفن
-    """
-    existing_user = db.query(User).filter(User.email == email).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="این ایمیل قبلاً ثبت شده است")
-    
-    existing_national = db.query(User).filter(User.national_id == national_id).first()
-    if existing_national:
-        raise HTTPException(status_code=400, detail="این کد ملی قبلاً ثبت شده است")
-    
-    existing_phone = db.query(User).filter(User.phone_number == phone_number).first()
-    if existing_phone:
-        raise HTTPException(status_code=400, detail="این شماره تلفن قبلاً ثبت شده است")
 
 @app.get("/debug-db")
 async def debug_db():
@@ -784,67 +888,23 @@ async def debug_users(db: Session = Depends(get_db)):
             "error": str(e)
         }
 
+# 📝 ثبت‌نام قدیمی - برای سازگاری با کد موجود (استفاده از signup-step1 جدید)
 @app.post("/users", response_model=UserResponse)
 async def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    """
+    ثبت‌نام قدیمی - فقط برای سازگاری
+    در حال حاضر از /signup-step1 و /verify-otp استفاده کنید
+    """
     try:
-        logger.info(f"دریافت اطلاعات کاربر برای ثبت‌نام: {user.email}")
+        logger.info(f"دریافت اطلاعات کاربر برای ثبت‌نام قدیمی: {user.email}")
         
-        required_fields = {
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "email": user.email,
-            "national_id": user.national_id,
-            "phone_number": user.phone_number,
-            "country": user.country,
-            "province": user.province,
-            "city": user.city,
-            "gender": user.gender,
-            "password": user.password
-        }
+        # استفاده از منطق جدید
+        signup_response = await signup_step1(SignupStep1Request(**user.dict()), db)
         
-        missing_fields = [field for field, value in required_fields.items() if not value]
-        if missing_fields:
-            raise HTTPException(status_code=400, detail=f"فیلدهای زیر الزامی هستند: {', '.join(missing_fields)}")
-        
-        if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", user.email):
-            raise HTTPException(status_code=400, detail="فرمت ایمیل نامعتبر است")
-        
-        # بررسی تکراری بودن اطلاعات
-        await check_duplicate_user(user.email, user.national_id, user.phone_number, db)
-        
-        if not user.national_id.isdigit() or len(user.national_id) != 10:
-            raise HTTPException(status_code=400, detail="کد ملی باید 10 رقم باشد")
-        
-        if not user.phone_number.startswith("09") or len(user.phone_number) != 11 or not user.phone_number.isdigit():
-            raise HTTPException(status_code=400, detail="شماره تلفن باید 11 رقم و با 09 شروع شود")
-        
-        if len(user.password) < 6:
-            raise HTTPException(status_code=400, detail="رمز عبور باید حداقل 6 کاراکتر باشد")
-        
-        if user.gender not in ['male', 'female']:
-            raise HTTPException(status_code=400, detail="جنسیت باید مرد یا زن باشد")
-        
-        hashed_password = get_password_hash(user.password)
-        
-        db_user = User(
-            first_name=user.first_name,
-            last_name=user.last_name,
-            email=user.email,
-            national_id=user.national_id,
-            phone_number=user.phone_number,
-            country=user.country,
-            province=user.province,
-            city=user.city,
-            gender=user.gender,
-            password=hashed_password,
-            is_verified=False  # کاربر در ابتدا تایید نشده است
-        )
-        
-        db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
-        
-        logger.info(f"کاربر با موفقیت ایجاد شد: {db_user.id} - {db_user.email}")
+        # پیدا کردن کاربر ایجاد شده
+        db_user = db.query(User).filter(User.email == user.email).first()
+        if not db_user:
+            raise HTTPException(status_code=500, detail="خطا در ایجاد کاربر")
         
         return UserResponse(
             id=db_user.id,
@@ -862,10 +922,8 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
         )
         
     except HTTPException:
-        db.rollback()
         raise
     except Exception as e:
-        db.rollback()
         logger.error(f"خطا در ایجاد کاربر: {str(e)}")
         raise HTTPException(status_code=500, detail=f"خطای سرور در ایجاد کاربر: {str(e)}")
 
@@ -1736,7 +1794,7 @@ async def get_user_events(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادهای کاربر")
 
 # اضافه کردن endpoint برای نوتیفیکیشن‌ها
-@app.get("/users/{user_id}/notifications", response_model=List[NotificationResponse])
+@app.get("/users/{user_id}/notifications", response_model=List[NotificationResponse)
 async def get_user_notifications(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         if current_user.id != user_id:
