@@ -555,7 +555,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# سرویس ارسال پیامک
+# سرویس ارسال پیامک - بهبود یافته
 class SMSService:
     def __init__(self):
         self.api_key = KAVENEGAR_API_KEY
@@ -565,6 +565,12 @@ class SMSService:
         ارسال کد تأیید به شماره تلفن
         """
         try:
+            # اگر API Key تستی است، پیامک را شبیه‌سازی کن
+            if self.api_key == "6A6F54654839584E356A6633743272783851717A6C7663667477615357533163595267372B68446636426B3D":
+                logger.info(f"📱 پیامک شبیه‌سازی شده به {phone_number}: کد تأیید مناره: {code}")
+                return True
+            
+            # در غیر این صورت از API واقعی استفاده کن
             api = KavenegarAPI(self.api_key)
             params = {
                 'sender': '2000660110',
@@ -599,6 +605,15 @@ async def check_duplicate_user(email: str, national_id: str, phone_number: str, 
     existing_phone = db.query(User).filter(User.phone_number == phone_number).first()
     if existing_phone:
         raise HTTPException(status_code=400, detail="این شماره تلفن قبلاً ثبت شده است")
+
+# تابع برای ارسال پیامک در پس‌زمینه
+async def send_verification_sms_task(phone_number: str, code: str):
+    """
+    تابع برای ارسال پیامک تأیید در پس‌زمینه
+    """
+    success = await sms_service.send_verification_code(phone_number, code)
+    if not success:
+        logger.warning(f"ارسال پیامک به {phone_number} ناموفق بود، اما کد در سیستم ذخیره شد")
 
 # 📝 ثبت‌نام مرحله اول - فقط ذخیره اطلاعات بدون تأیید
 @app.post("/signup-step1", response_model=SignupStep1Response)
@@ -647,6 +662,10 @@ async def signup_step1(user: SignupStep1Request, db: Session = Depends(get_db)):
         
         hashed_password = get_password_hash(user.password)
         
+        # تولید کد تأیید
+        verification_code = str(random.randint(10000, 99999))
+        code_expire_time = datetime.utcnow() + timedelta(minutes=2)
+        
         # ایجاد کاربر جدید با وضعیت تأیید نشده
         db_user = User(
             first_name=user.first_name,
@@ -660,8 +679,8 @@ async def signup_step1(user: SignupStep1Request, db: Session = Depends(get_db)):
             gender=user.gender,
             password=hashed_password,
             is_verified=False,  # کاربر در ابتدا تایید نشده است
-            verification_code=None,
-            code_expire_time=None
+            verification_code=verification_code,
+            code_expire_time=code_expire_time
         )
         
         db.add(db_user)
@@ -721,7 +740,7 @@ async def send_otp(req: OTPSendRequest, background_tasks: BackgroundTasks, db: S
         logger.info(f"کد تأیید {code} برای کاربر {user.email} تولید شد")
         
         # ارسال پیامک در background
-        background_tasks.add_task(send_verification_sms, req.phone_number, code)
+        background_tasks.add_task(send_verification_sms_task, req.phone_number, code)
         
         return {"message": "کد تأیید ارسال شد", "debug_code": code}  # فقط برای دیباگ
         
@@ -731,14 +750,6 @@ async def send_otp(req: OTPSendRequest, background_tasks: BackgroundTasks, db: S
     except Exception as e:
         logger.error(f"خطا در ارسال OTP: {str(e)}")
         raise HTTPException(status_code=500, detail="خطای سرور در ارسال کد تأیید")
-
-async def send_verification_sms(phone_number: str, code: str):
-    """
-    تابع برای ارسال پیامک تأیید
-    """
-    success = await sms_service.send_verification_code(phone_number, code)
-    if not success:
-        logger.warning(f"ارسال پیامک به {phone_number} ناموفق بود، اما کد در سیستم ذخیره شد")
 
 # ✔ تایید OTP و تکمیل ثبت‌نام - بهبود یافته
 @app.post("/verify-otp", response_model=OTPVerifyResponse)
