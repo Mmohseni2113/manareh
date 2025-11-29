@@ -1968,7 +1968,7 @@ async def remove_from_favorites(user_id: int, event_id: int, current_user: User 
         logger.error(f"خطا در حذف از علاقه‌مندی‌ها: {e}")
         raise HTTPException(500, "خطای سرور در حذف از علاقه‌مندی‌ها")
 
-@app.get("/users/{user_id}/favorites", response_model=List[EventResponse)
+@app.get("/users/{user_id}/favorites", response_model=List[EventResponse])
 async def get_user_favorites(user_id: int, db: Session = Depends(get_db)):
     try:
         logger.info(f"دریافت علاقه‌مندی‌های کاربر {user_id}")
