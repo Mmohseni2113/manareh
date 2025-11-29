@@ -580,15 +580,10 @@ class SMSService:
     
     async def send_verification_code(self, phone_number: str, code: str) -> bool:
         """
-        ارسال کد تأیید به شماره تلفن
+        ارسال کد تأیید به شماره تلفن با استفاده از API کاوه‌نگار
         """
         try:
-            # اگر API Key تستی است، پیامک را شبیه‌سازی کن
-            if self.api_key == "6A6F54654839584E356A6633743272783851717A6C7663667477615357533163595267372B68446636426B3D":
-                logger.info(f"📱 پیامک شبیه‌سازی شده به {phone_number}: کد تأیید مناره: {code}")
-                return True
-            
-            # در غیر این صورت از API واقعی استفاده کن
+            # استفاده از API واقعی کاوه‌نگار
             api = KavenegarAPI(self.api_key)
             params = {
                 'sender': '2000660110',
@@ -984,6 +979,15 @@ async def signup_step1(user: SignupStep1Request, db: Session = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"خطای سرور در ثبت‌نام: {str(e)}"
         )
+
+# 🔑 اضافه کردن endpoint برای لاگین
+@app.post("/token")
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == form_data.username).first()
+    if not user or user.password != hashlib.sha256(form_data.password.encode()).hexdigest():
+        raise HTTPException(status_code=400, detail="ایمیل یا رمز اشتباه است")
+    access_token = create_access_token({"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 # بقیه endpointها بدون تغییر باقی می‌مانند...
 # فقط dependencyهایشان به get_db تغییر می‌کند
