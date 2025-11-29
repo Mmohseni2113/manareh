@@ -748,77 +748,48 @@ async def send_otp(request: OTPSendRequest, background_tasks: BackgroundTasks, d
             detail="خطای سرور در ارسال کد تأیید"
         )
 
-# ✔ تایید OTP و تکمیل ثبت‌نام - بهبود یافته
+# 📩 تایید کد OTP و فعال‌سازی حساب کاربری
 @app.post("/verify-otp", response_model=OTPVerifyResponse)
 async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
-    """
-    تایید کد تأیید و فعال کردن حساب کاربری
-    این endpoint هم برای کاربران موجود و هم برای ثبت‌نام جدید کار می‌کند
-    """
     try:
-        # ابتدا بررسی جدول موقت
         otp_temp = db.query(OTPTemp).filter(OTPTemp.email == request.email).first()
-        
+
+        # ❌ کد موقت پیدا نشد
         if not otp_temp:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="کد تأیید یافت نشد. لطفاً مجدداً درخواست کد دهید"
-            )
-        
-        # بررسی تطابق کد
+            raise HTTPException(404, "کد تأیید یافت نشد. لطفاً مجدداً درخواست کد دهید")
+
+        # 📌 کد اشتباهه
         if otp_temp.verification_code != request.code:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="کد تأیید اشتباه است"
-            )
-        
-        # بررسی انقضای کد
+            raise HTTPException(400, "کد تأیید اشتباه است")
+
+        # ⏳ کد منقضی شده
         if datetime.utcnow() > otp_temp.code_expire_time:
-            # حذف کد منقضی شده
             db.delete(otp_temp)
             db.commit()
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="کد تأیید منقضی شده است. لطفاً مجدداً درخواست کد دهید"
-            )
-        
-        # بررسی وجود کاربر در دیتابیس اصلی
+            raise HTTPException(400, "کد تأیید منقضی شده است. لطفاً دوباره درخواست دهید")
+
+        # 👤 بررسی کاربر موجود
         user = db.query(User).filter(User.email == request.email).first()
-        
+
         if user:
-            # کاربر موجود - فقط تایید حساب
-            logger.info(f"تایید حساب کاربری موجود: {user.email}")
-            
-            # بررسی اینکه آیا کاربر قبلاً تایید شده
             if user.is_verified:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="حساب کاربری شما قبلاً تایید شده است"
-                )
-            
-            # تایید حساب کاربری
+                raise HTTPException(400, "حساب کاربری شما قبلاً تأیید شده است")
+
             user.is_verified = True
             user.verification_code = None
             user.code_expire_time = None
-            
+
         else:
-            # کاربر جدید - ایجاد حساب کاربری
-            logger.info(f"ایجاد حساب کاربری جدید برای: {request.email}")
-            
+            # 📌 ثبت‌نام کاربر جدید
             if not otp_temp.user_data:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="داده‌های کاربر برای ثبت‌نام یافت نشد"
-                )
-            
+                raise HTTPException(400, "داده‌های کاربر برای ثبت‌نام یافت نشد")
+
             try:
-                # تبدیل داده‌های کاربر از رشته به دیکشنری
                 import ast
                 user_data = ast.literal_eval(otp_temp.user_data)
-                
-                # ایجاد کاربر جدید
+
                 hashed_password = get_password_hash(user_data['password'])
-                
+
                 user = User(
                     first_name=user_data['first_name'],
                     last_name=user_data['last_name'],
@@ -832,41 +803,30 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
                     password=hashed_password,
                     is_verified=True
                 )
-                
                 db.add(user)
-                
+
             except Exception as e:
-                logger.error(f"خطا در ایجاد کاربر جدید: {e}")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="خطا در پردازش داده‌های کاربر"
-                )
-        
-        # حذف رکورد موقت
+                logger.error(f"⚠️ خطا در ایجاد کاربر جدید: {e}")
+                raise HTTPException(400, "خطا در پردازش داده‌های کاربر")
+
         db.delete(otp_temp)
         db.commit()
         db.refresh(user)
-        
-        logger.info(f"حساب کاربری {user.email} با موفقیت تایید و ایجاد شد")
-        
-        # ایجاد توکن دسترسی
+
         access_token = create_access_token(data={"sub": user.email})
-        
+
         return OTPVerifyResponse(
             message="حساب کاربری شما با موفقیت تایید شد",
             access_token=access_token,
             token_type="bearer",
             user_id=user.id
         )
-        
-    except HTTPException as he:
-        raise he
+
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        logger.error(f"خطا در تایید OTP: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="خطای سرور در تایید کد"
-        )
+        logger.error(f"⚠️ خطای کلی در verify_otp: {e}")
+        raise HTTPException(500, "خطای سرور در تایید کد")
 
 # 📝 ثبت‌نام مرحله اول - فقط ذخیره اطلاعات در otp_temp و ارسال OTP
 @app.post("/signup-step1", response_model=SignupStep1Response)
@@ -973,9 +933,9 @@ async def signup_step1(user: SignupStep1Request, db: Session = Depends(get_db)):
             requires_verification=True
         )
         
-    except HTTPException as he:
+    except HTTPException:
         db.rollback()
-        raise he
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"خطا در ثبت‌نام مرحله اول: {str(e)}")
