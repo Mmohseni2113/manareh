@@ -859,8 +859,8 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
             user_id=user.id
         )
         
-    except HTTPException:
-        raise
+    except HTTPException as he:
+        raise he
     except Exception as e:
         logger.error(f"خطا در تایید OTP: {e}")
         raise HTTPException(
@@ -973,9 +973,9 @@ async def signup_step1(user: SignupStep1Request, db: Session = Depends(get_db)):
             requires_verification=True
         )
         
-    except HTTPException:
+    except HTTPException as he:
         db.rollback()
-        raise
+        raise he
     except Exception as e:
         db.rollback()
         logger.error(f"خطا در ثبت‌نام مرحله اول: {str(e)}")
