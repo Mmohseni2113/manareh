@@ -696,13 +696,16 @@ async def send_otp(request: OTPSendRequest, background_tasks: BackgroundTasks, d
         db.query(OTPTemp).filter(OTPTemp.email == request.email).delete()
         
         # ذخیره کد در جدول موقت
+        import json
+
         otp_temp = OTPTemp(
             email=request.email,
             phone_number=request.phone_number,
             verification_code=code,
             code_expire_time=code_expire_time,
-            user_data=str(request.user_data) if request.user_data else None
+            user_data=json.dumps(request.user_data) if request.user_data else None
         )
+
         
         db.add(otp_temp)
         db.commit()
@@ -785,8 +788,8 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
                 raise HTTPException(400, "داده‌های کاربر برای ثبت‌نام یافت نشد")
 
             try:
-                import ast
-                user_data = ast.literal_eval(otp_temp.user_data)
+                import json
+                user_data = json.loads(otp_temp.user_data)
 
                 hashed_password = get_password_hash(user_data['password'])
 
