@@ -573,39 +573,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# سرویس ارسال پیامک - بهبود یافته
+# سرویس ارسال پیامک - نسخه واقعی و جایگذاری‌شده
 class SMSService:
     def __init__(self):
-        self.api_key = KAVENEGAR_API_KEY
+        # همین API Key که خودت دادی، مستقیم گذاشته شد
+        self.api_key = "6A6F54654839584E356A6633743272783851717A6C7663667477615357533163595267372B68446636426B3D"
     
     async def send_verification_code(self, phone_number: str, code: str) -> bool:
         """
-        ارسال کد تأیید به شماره تلفن
+        ارسال کد تأیید واقعی با کاوه نگار
         """
         try:
-            # اگر API Key تستی است، پیامک را شبیه‌سازی کن
-            if self.api_key == "6A6F54654839584E356A6633743272783851717A6C7663667477615357533163595267372B68446636426B3D":
-                logger.info(f"📱 پیامک شبیه‌سازی شده به {phone_number}: کد تأیید مناره: {code}")
-                return True
-            
-            # در غیر این صورت از API واقعی استفاده کن
             api = KavenegarAPI(self.api_key)
             params = {
-                'sender': '2000660110',
-                'receptor': phone_number,
+                'sender': '2000660110',  # شماره خط پیامکی ثابت تو
+                'receptor': phone_number,  # شماره کاربر (دینامیک)
                 'message': f'کد تایید مناره: {code}\nاین کد به مدت ۲ دقیقه معتبر است.'
             }
             response = api.sms_send(params)
-            logger.info(f"پیامک ارسال شد به {phone_number}: {response}")
+            logger.info(f"📨 پیامک واقعی ارسال شد به {phone_number}: {response}")
             return True
+
         except APIException as e:
-            logger.error(f"خطای API در ارسال پیامک به {phone_number}: {e}")
+            logger.error(f"❌ خطای API در ارسال پیامک به {phone_number}: {e}")
             return False
+        
         except Exception as e:
-            logger.error(f"خطای ناشناخته در ارسال پیامک به {phone_number}: {e}")
+            logger.error(f"⚠️ خطای ناشناخته در ارسال پیامک به {phone_number}: {e}")
             return False
 
+
 sms_service = SMSService()
+
 
 # بررسی تکراری بودن ایمیل و شماره تلفن
 async def check_duplicate_user(email: str, national_id: str, phone_number: str, db: Session) -> None:
