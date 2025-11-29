@@ -448,8 +448,8 @@ class FavoriteResponse(BaseModel):
 
 # مدل‌های جدید برای OTP
 class OTPSendRequest(BaseModel):
-    phone_number: str
     email: str
+    phone_number: str
 
 class OTPVerifyRequest(BaseModel):
     email: str
@@ -504,8 +504,8 @@ def create_access_token(data: dict):
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials"
+        status.HTTP_401_UNAUTHORIZED,
+        "Could not validate credentials"
     )
     try:
         # اگر توکن خالی است، خطا نده و None برگردان
@@ -524,8 +524,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         # بررسی اینکه کاربر تایید شده است
         if not user.is_verified:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="حساب کاربری شما تایید نشده است. لطفاً شماره تلفن خود را تایید کنید."
+                status.HTTP_401_UNAUTHORIZED,
+                "حساب کاربری شما تایید نشده است. لطفاً شماره تلفن خود را تایید کنید."
             )
             
         return user
@@ -596,15 +596,15 @@ async def check_duplicate_user(email: str, national_id: str, phone_number: str, 
     """
     existing_user = db.query(User).filter(User.email == email).first()
     if existing_user:
-        raise HTTPException(status_code=400, detail="این ایمیل قبلاً ثبت شده است")
+        raise HTTPException(400, "این ایمیل قبلاً ثبت شده است")
     
     existing_national = db.query(User).filter(User.national_id == national_id).first()
     if existing_national:
-        raise HTTPException(status_code=400, detail="این کد ملی قبلاً ثبت شده است")
+        raise HTTPException(400, "این کد ملی قبلاً ثبت شده است")
     
     existing_phone = db.query(User).filter(User.phone_number == phone_number).first()
     if existing_phone:
-        raise HTTPException(status_code=400, detail="این شماره تلفن قبلاً ثبت شده است")
+        raise HTTPException(400, "این شماره تلفن قبلاً ثبت شده است")
 
 # تابع برای ارسال پیامک در پس‌زمینه
 async def send_verification_sms_task(phone_number: str, code: str):
@@ -614,6 +614,123 @@ async def send_verification_sms_task(phone_number: str, code: str):
     success = await sms_service.send_verification_code(phone_number, code)
     if not success:
         logger.warning(f"ارسال پیامک به {phone_number} ناموفق بود، اما کد در سیستم ذخیره شد")
+
+# 📤 ارسال OTP - کاملاً اصلاح شده
+@app.post("/send-otp")
+async def send_otp(request: OTPSendRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """
+    ارسال کد تأیید به شماره تلفن کاربر
+    """
+    try:
+        logger.info(f"درخواست ارسال OTP برای ایمیل: {request.email} و شماره: {request.phone_number}")
+        
+        # بررسی وجود کاربر
+        user = db.query(User).filter(User.email == request.email).first()
+        if not user:
+            logger.warning(f"کاربر با ایمیل {request.email} یافت نشد")
+            raise HTTPException(404, "کاربر یافت نشد")
+        
+        # بررسی تطابق شماره تلفن
+        if user.phone_number != request.phone_number:
+            logger.warning(f"شماره تلفن {request.phone_number} با ایمیل {request.email} مطابقت ندارد")
+            raise HTTPException(400, "شماره تلفن با ایمیل مطابقت ندارد")
+        
+        # بررسی اینکه آیا کاربر قبلاً تایید شده
+        if user.is_verified:
+            logger.info(f"کاربر {request.email} قبلاً تایید شده است")
+            raise HTTPException(400, "حساب کاربری شما قبلاً تایید شده است")
+        
+        # تولید کد تصادفی
+        code = str(random.randint(10000, 99999))  # کد ۵ رقمی
+        
+        # ذخیره کد در دیتابیس با زمان انقضا
+        user.verification_code = code
+        user.code_expire_time = datetime.utcnow() + timedelta(minutes=2)  # ۲ دقیقه اعتبار
+        db.commit()
+        
+        logger.info(f"کد تأیید {code} برای کاربر {user.email} تولید و ذخیره شد")
+        
+        # ارسال پیامک در background
+        try:
+            success = await sms_service.send_verification_code(request.phone_number, code)
+            if not success:
+                logger.error(f"خطا در ارسال پیامک به {request.phone_number}")
+                raise HTTPException(503, "سرویس ارسال پیامک در دسترس نیست. لطفاً稍后再试")
+            
+            logger.info(f"پیامک با کد {code} به شماره {request.phone_number} ارسال شد")
+            
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "message": "کد تأیید با موفقیت ارسال شد",
+                    "debug_code": code  # فقط برای محیط توسعه
+                }
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"خطای ناشناخته در ارسال پیامک: {str(e)}")
+            raise HTTPException(500, "خطای سرور در ارسال کد تأیید")
+        
+    except HTTPException as he:
+        logger.error(f"HTTPException در ارسال OTP: {he.detail}")
+        raise he
+    except Exception as e:
+        logger.error(f"خطا در ارسال OTP: {str(e)}")
+        raise HTTPException(500, "خطای سرور در ارسال کد تأیید")
+
+# ✔ تایید OTP و تکمیل ثبت‌نام - بهبود یافته
+@app.post("/verify-otp", response_model=OTPVerifyResponse)
+async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
+    """
+    تایید کد تأیید و فعال کردن حساب کاربری
+    """
+    try:
+        user = db.query(User).filter(User.email == request.email).first()
+
+        if not user:
+            raise HTTPException(404, "کاربر یافت نشد")
+        
+        # بررسی اینکه آیا کاربر قبلاً تایید شده
+        if user.is_verified:
+            raise HTTPException(400, "حساب کاربری شما قبلاً تایید شده است")
+        
+        # بررسی وجود کد تأیید
+        if not user.verification_code:
+            raise HTTPException(400, "کد تأیید یافت نشد. لطفاً مجدداً درخواست کد دهید")
+        
+        # بررسی تطابق کد
+        if user.verification_code != request.code:
+            raise HTTPException(400, "کد تأیید اشتباه است")
+        
+        # بررسی انقضای کد
+        if datetime.utcnow() > user.code_expire_time:
+            raise HTTPException(400, "کد تأیید منقضی شده است. لطفاً مجدداً درخواست کد دهید")
+        
+        # تایید حساب کاربری
+        user.is_verified = True
+        user.verification_code = None  # پاک کردن کد استفاده شده
+        user.code_expire_time = None
+        db.commit()
+        
+        logger.info(f"حساب کاربری {user.email} با موفقیت تایید شد")
+        
+        # ایجاد توکن دسترسی
+        access_token = create_access_token(data={"sub": user.email})
+        
+        return OTPVerifyResponse(
+            message="حساب کاربری شما با موفقیت تایید شد",
+            access_token=access_token,
+            token_type="bearer",
+            user_id=user.id
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"خطا در تایید OTP: {e}")
+        raise HTTPException(500, "خطای سرور در تایید کد")
 
 # 📝 ثبت‌نام مرحله اول - فقط ذخیره اطلاعات بدون تأیید
 @app.post("/signup-step1", response_model=SignupStep1Response)
@@ -640,25 +757,25 @@ async def signup_step1(user: SignupStep1Request, db: Session = Depends(get_db)):
         
         missing_fields = [field for field, value in required_fields.items() if not value]
         if missing_fields:
-            raise HTTPException(status_code=400, detail=f"فیلدهای زیر الزامی هستند: {', '.join(missing_fields)}")
+            raise HTTPException(400, f"فیلدهای زیر الزامی هستند: {', '.join(missing_fields)}")
         
         if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", user.email):
-            raise HTTPException(status_code=400, detail="فرمت ایمیل نامعتبر است")
+            raise HTTPException(400, "فرمت ایمیل نامعتبر است")
         
         # بررسی تکراری بودن اطلاعات
         await check_duplicate_user(user.email, user.national_id, user.phone_number, db)
         
         if not user.national_id.isdigit() or len(user.national_id) != 10:
-            raise HTTPException(status_code=400, detail="کد ملی باید 10 رقم باشد")
+            raise HTTPException(400, "کد ملی باید 10 رقم باشد")
         
         if not user.phone_number.startswith("09") or len(user.phone_number) != 11 or not user.phone_number.isdigit():
-            raise HTTPException(status_code=400, detail="شماره تلفن باید 11 رقم و با 09 شروع شود")
+            raise HTTPException(400, "شماره تلفن باید 11 رقم و با 09 شروع شود")
         
         if len(user.password) < 6:
-            raise HTTPException(status_code=400, detail="رمز عبور باید حداقل 6 کاراکتر باشد")
+            raise HTTPException(400, "رمز عبور باید حداقل 6 کاراکتر باشد")
         
         if user.gender not in ['male', 'female']:
-            raise HTTPException(status_code=400, detail="جنسیت باید مرد یا زن باشد")
+            raise HTTPException(400, "جنسیت باید مرد یا زن باشد")
         
         hashed_password = get_password_hash(user.password)
         
@@ -702,106 +819,7 @@ async def signup_step1(user: SignupStep1Request, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"خطا در ثبت‌نام مرحله اول: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"خطای سرور در ثبت‌نام: {str(e)}")
-
-# 📤 ارسال OTP - بهبود یافته
-@app.post("/send-otp", response_model=Dict[str, str])
-async def send_otp(req: OTPSendRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """
-    ارسال کد تأیید به شماره تلفن کاربر
-    """
-    try:
-        logger.info(f"درخواست ارسال OTP برای ایمیل: {req.email} و شماره: {req.phone_number}")
-        
-        # بررسی وجود کاربر
-        user = db.query(User).filter(User.email == req.email).first()
-        if not user:
-            logger.warning(f"کاربر با ایمیل {req.email} یافت نشد")
-            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
-        
-        # بررسی تطابق شماره تلفن
-        if user.phone_number != req.phone_number:
-            logger.warning(f"شماره تلفن {req.phone_number} با ایمیل {req.email} مطابقت ندارد")
-            raise HTTPException(status_code=400, detail="شماره تلفن با ایمیل مطابقت ندارد")
-        
-        # بررسی اینکه آیا کاربر قبلاً تایید شده
-        if user.is_verified:
-            logger.info(f"کاربر {req.email} قبلاً تایید شده است")
-            raise HTTPException(status_code=400, detail="حساب کاربری شما قبلاً تایید شده است")
-        
-        # تولید کد تصادفی
-        code = str(random.randint(10000, 99999))  # کد ۵ رقمی
-        
-        # ذخیره کد در دیتابیس با زمان انقضا
-        user.verification_code = code
-        user.code_expire_time = datetime.utcnow() + timedelta(minutes=2)  # ۲ دقیقه اعتبار
-        db.commit()
-        
-        logger.info(f"کد تأیید {code} برای کاربر {user.email} تولید شد")
-        
-        # ارسال پیامک در background
-        background_tasks.add_task(send_verification_sms_task, req.phone_number, code)
-        
-        return {"message": "کد تأیید ارسال شد", "debug_code": code}  # فقط برای دیباگ
-        
-    except HTTPException as he:
-        logger.error(f"HTTPException در ارسال OTP: {he.detail}")
-        raise he
-    except Exception as e:
-        logger.error(f"خطا در ارسال OTP: {str(e)}")
-        raise HTTPException(status_code=500, detail="خطای سرور در ارسال کد تأیید")
-
-# ✔ تایید OTP و تکمیل ثبت‌نام - بهبود یافته
-@app.post("/verify-otp", response_model=OTPVerifyResponse)
-async def verify_otp(req: OTPVerifyRequest, db: Session = Depends(get_db)):
-    """
-    تایید کد تأیید و فعال کردن حساب کاربری
-    """
-    try:
-        user = db.query(User).filter(User.email == req.email).first()
-
-        if not user:
-            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
-        
-        # بررسی اینکه آیا کاربر قبلاً تایید شده
-        if user.is_verified:
-            raise HTTPException(status_code=400, detail="حساب کاربری شما قبلاً تایید شده است")
-        
-        # بررسی وجود کد تأیید
-        if not user.verification_code:
-            raise HTTPException(status_code=400, detail="کد تأیید یافت نشد. لطفاً مجدداً درخواست کد دهید")
-        
-        # بررسی تطابق کد
-        if user.verification_code != req.code:
-            raise HTTPException(status_code=400, detail="کد تأیید اشتباه است")
-        
-        # بررسی انقضای کد
-        if datetime.utcnow() > user.code_expire_time:
-            raise HTTPException(status_code=400, detail="کد تأیید منقضی شده است. لطفاً مجدداً درخواست کد دهید")
-        
-        # تایید حساب کاربری
-        user.is_verified = True
-        user.verification_code = None  # پاک کردن کد استفاده شده
-        user.code_expire_time = None
-        db.commit()
-        
-        logger.info(f"حساب کاربری {user.email} با موفقیت تایید شد")
-        
-        # ایجاد توکن دسترسی
-        access_token = create_access_token(data={"sub": user.email})
-        
-        return OTPVerifyResponse(
-            message="حساب کاربری شما با موفقیت تایید شد",
-            access_token=access_token,
-            token_type="bearer",
-            user_id=user.id
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"خطا در تایید OTP: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در تایید کد")
+        raise HTTPException(500, f"خطای سرور در ثبت‌نام: {str(e)}")
 
 @app.get("/debug-db")
 async def debug_db():
@@ -921,7 +939,7 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
         # پیدا کردن کاربر ایجاد شده
         db_user = db.query(User).filter(User.email == user.email).first()
         if not db_user:
-            raise HTTPException(status_code=500, detail="خطا در ایجاد کاربر")
+            raise HTTPException(500, "خطا در ایجاد کاربر")
         
         return UserResponse(
             id=db_user.id,
@@ -942,7 +960,7 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"خطا در ایجاد کاربر: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"خطای سرور در ایجاد کاربر: {str(e)}")
+        raise HTTPException(500, f"خطای سرور در ایجاد کاربر: {str(e)}")
 
 @app.post("/token", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
@@ -953,22 +971,22 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
         if not user:
             logger.warning("کاربر یافت نشد")
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="ایمیل یا رمز عبور اشتباه است"
+                status.HTTP_401_UNAUTHORIZED,
+                "ایمیل یا رمز عبور اشتباه است"
             )
         
         # بررسی تایید شدن حساب کاربری
         if not user.is_verified:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="حساب کاربری شما تایید نشده است. لطفاً شماره تلفن خود را تایید کنید."
+                status.HTTP_401_UNAUTHORIZED,
+                "حساب کاربری شما تایید نشده است. لطفاً شماره تلفن خود را تایید کنید."
             )
         
         if not verify_password(form_data.password, user.password):
             logger.warning("رمز عبور نادرست")
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="ایمیل یا رمز عبور اشتباه است"
+                status.HTTP_401_UNAUTHORIZED,
+                "ایمیل یا رمز عبور اشتباه است"
             )
         
         access_token = create_access_token(data={"sub": user.email})
@@ -979,7 +997,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
         raise
     except Exception as e:
         logger.error(f"خطا در ورود: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در ورود")
+        raise HTTPException(500, "خطای سرور در ورود")
 
 @app.post("/login")
 async def login_debug(login_data: LoginRequest, db: Session = Depends(get_db)):
@@ -1138,11 +1156,11 @@ async def create_event(event: EventCreate, current_user: User = Depends(get_curr
         logger.info(f"دریافت درخواست ایجاد رویداد از کاربر: {current_user.email if current_user else 'Anonymous'}")
         
         if not all([event.title, event.time, event.location]):
-            raise HTTPException(status_code=400, detail="لطفاً همه فیلدها را پر کنید")
+            raise HTTPException(400, "لطفاً همه فیلدها را پر کنید")
         
         user_exists = db.query(User).filter(User.id == event.creator).first()
         if not user_exists:
-            raise HTTPException(status_code=400, detail="کاربر ایجاد کننده معتبر نیست")
+            raise HTTPException(400, "کاربر ایجاد کننده معتبر نیست")
         
         if not event.city:
             event.city = current_user.city if current_user else "تهران"
@@ -1187,7 +1205,7 @@ async def create_event(event: EventCreate, current_user: User = Depends(get_curr
     except Exception as e:
         db.rollback()
         logger.error(f"خطا در ایجاد رویداد: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در ایجاد رویداد")
+        raise HTTPException(500, "خطای سرور در ایجاد رویداد")
 
 @app.get("/events", response_model=List[EventResponse])
 async def get_events(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -1241,7 +1259,7 @@ async def get_events(current_user: User = Depends(get_current_user), db: Session
         return events_list
     except Exception as e:
         logger.error(f"خطا در دریافت رویدادها: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادها")
+        raise HTTPException(500, "خطای سرور در دریافت رویدادها")
 
 # اضافه کردن endpoint جدید برای events/optimized
 @app.get("/events/optimized", response_model=List[EventResponse])
@@ -1301,7 +1319,7 @@ async def get_events_optimized(
         return events_list
     except Exception as e:
         logger.error(f"خطا در دریافت رویدادهای بهینه‌شده: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادها")
+        raise HTTPException(500, "خطای سرور در دریافت رویدادها")
 
 @app.get("/events/public", response_model=List[EventResponse])
 async def get_public_events(db: Session = Depends(get_db)):
@@ -1346,14 +1364,14 @@ async def get_public_events(db: Session = Depends(get_db)):
         return events_list
     except Exception as e:
         logger.error(f"خطا در دریافت رویدادهای عمومی: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادها")
+        raise HTTPException(500, "خطای سرور در دریافت رویدادها")
 
 @app.put("/events/{event_id}/update-fields")
 async def update_event_fields(event_id: int, db: Session = Depends(get_db)):
     try:
         db_event = db.query(Event).filter(Event.id == event_id).first()
         if not db_event:
-            raise HTTPException(status_code=404, detail="رویداد یافت نشد")
+            raise HTTPException(404, "رویداد یافت نشد")
         
         creator_user = db.query(User).filter(User.id == db_event.creator).first()
         
@@ -1382,18 +1400,18 @@ async def update_event_fields(event_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"خطا در به‌روزرسانی رویداد: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در به‌روزرسانی رویداد")
+        raise HTTPException(500, "خطای سرور در به‌روزرسانی رویداد")
 
 @app.get("/users/{user_id}", response_model=UserResponse)
 async def get_user(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
-            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+            raise HTTPException(404, "کاربر یافت نشد")
         return user
     except Exception as e:
         logger.error(f"خطا در دریافت اطلاعات کاربر: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در دریافت اطلاعات کاربر")
+        raise HTTPException(500, "خطای سرور در دریافت اطلاعات کاربر")
 
 @app.get("/users/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -1401,7 +1419,7 @@ async def get_current_user_info(current_user: User = Depends(get_current_user), 
         return current_user
     except Exception as e:
         logger.error(f"خطا در دریافت اطلاعات کاربر جاری: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در دریافت اطلاعات کاربر")
+        raise HTTPException(500, "خطای سرور در دریافت اطلاعات کاربر")
 
 # اضافه کردن endpoint جدید برای آمار کاربر
 @app.get("/users/{user_id}/stats", response_model=UserStatsResponse)
@@ -1414,7 +1432,7 @@ async def get_user_stats(
     try:
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
-            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+            raise HTTPException(404, "کاربر یافت نشد")
         
         # اگر کاربر جاری وجود ندارد یا کاربر جاری با کاربر درخواستی متفاوت است،
         # فقط اطلاعات عمومی را برگردان
@@ -1449,7 +1467,7 @@ async def get_user_stats(
         
     except Exception as e:
         logger.error(f"خطا در دریافت آمار کاربر: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در دریافت آمار کاربر")
+        raise HTTPException(500, "خطای سرور در دریافت آمار کاربر")
 
 # اضافه کردن endpoint عمومی برای آمار کاربر
 @app.get("/users/{user_id}/stats/public")
@@ -1458,7 +1476,7 @@ async def get_user_stats_public(user_id: int, db: Session = Depends(get_db)):
     try:
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
-            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+            raise HTTPException(404, "کاربر یافت نشد")
         
         # تعداد رویدادهای ایجاد شده توسط کاربر
         events_count = db.query(Event).filter(Event.creator == user_id).count()
@@ -1480,7 +1498,7 @@ async def get_user_stats_public(user_id: int, db: Session = Depends(get_db)):
         }
     except Exception as e:
         logger.error(f"خطا در دریافت آمار کاربر: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در دریافت آمار کاربر")
+        raise HTTPException(500, "خطای سرور در دریافت آمار کاربر")
 
 # اضافه کردن endpoint برای بررسی وضعیت توکن
 @app.get("/auth/check")
@@ -1510,14 +1528,14 @@ async def create_comment(comment: CommentCreate, current_user: User = Depends(ge
         
         event = db.query(Event).filter(Event.id == comment.event_id).first()
         if not event:
-            raise HTTPException(status_code=404, detail="رویداد یافت نشد")
+            raise HTTPException(404, "رویداد یافت نشد")
         
         user = db.query(User).filter(User.id == comment.user_id).first()
         if not user:
-            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+            raise HTTPException(404, "کاربر یافت نشد")
         
         if comment.rating < 1 or comment.rating > 5:
-            raise HTTPException(status_code=400, detail="امتیاز باید بین 1 تا 5 باشد")
+            raise HTTPException(400, "امتیاز باید بین 1 تا 5 باشد")
         
         existing_comment = db.query(Comment).filter(
             Comment.event_id == comment.event_id,
@@ -1556,7 +1574,7 @@ async def create_comment(comment: CommentCreate, current_user: User = Depends(ge
     except Exception as e:
         db.rollback()
         logger.error(f"خطا در ثبت نظر: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در ثبت نظر")
+        raise HTTPException(500, "خطای سرور در ثبت نظر")
 
 @app.get("/comments/{event_id}", response_model=List[CommentResponse])
 async def get_comments(event_id: int, db: Session = Depends(get_db)):
@@ -1565,7 +1583,7 @@ async def get_comments(event_id: int, db: Session = Depends(get_db)):
         
         event = db.query(Event).filter(Event.id == event_id).first()
         if not event:
-            raise HTTPException(status_code=404, detail="رویداد یافت نشد")
+            raise HTTPException(404, "رویداد یافت نشد")
         
         comments = db.query(Comment).filter(Comment.event_id == event_id).order_by(Comment.created_at.desc()).all()
         
@@ -1586,7 +1604,7 @@ async def get_comments(event_id: int, db: Session = Depends(get_db)):
         return comments_with_names
     except Exception as e:
         logger.error(f"خطا در دریافت نظرات: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در دریافت نظرات")
+        raise HTTPException(500, "خطای سرور در دریافت نظرات")
 
 @app.post("/events/{event_id}/register")
 async def register_for_event(event_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -1595,7 +1613,7 @@ async def register_for_event(event_id: int, current_user: User = Depends(get_cur
         
         event = db.query(Event).filter(Event.id == event_id).first()
         if not event:
-            raise HTTPException(status_code=404, detail="رویداد یافت نشد")
+            raise HTTPException(404, "رویداد یافت نشد")
         
         existing_registration = db.query(EventParticipant).filter(
             EventParticipant.event_id == event_id,
@@ -1603,11 +1621,11 @@ async def register_for_event(event_id: int, current_user: User = Depends(get_cur
         ).first()
         
         if existing_registration:
-            raise HTTPException(status_code=400, detail="شما قبلاً در این رویداد ثبت‌نام کرده‌اید")
+            raise HTTPException(400, "شما قبلاً در این رویداد ثبت‌نام کرده‌اید")
         
         current_participants = db.query(EventParticipant).filter(EventParticipant.event_id == event_id).count()
         if current_participants >= event.capacity:
-            raise HTTPException(status_code=400, detail="ظرفیت رویداد تکمیل شده است")
+            raise HTTPException(400, "ظرفیت رویداد تکمیل شده است")
         
         registration = EventParticipant(
             event_id=event_id,
@@ -1634,7 +1652,7 @@ async def register_for_event(event_id: int, current_user: User = Depends(get_cur
     except Exception as e:
         db.rollback()
         logger.error(f"خطا در ثبت‌نام: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در ثبت‌نام")
+        raise HTTPException(500, "خطای سرور در ثبت‌نام")
 
 # اضافه کردن endpoint جدید برای حذف ثبت‌نام از رویداد
 @app.delete("/events/{event_id}/unregister")
@@ -1644,7 +1662,7 @@ async def unregister_from_event(event_id: int, current_user: User = Depends(get_
         
         event = db.query(Event).filter(Event.id == event_id).first()
         if not event:
-            raise HTTPException(status_code=404, detail="رویداد یافت نشد")
+            raise HTTPException(404, "رویداد یافت نشد")
         
         registration = db.query(EventParticipant).filter(
             EventParticipant.event_id == event_id,
@@ -1652,7 +1670,7 @@ async def unregister_from_event(event_id: int, current_user: User = Depends(get_
         ).first()
         
         if not registration:
-            raise HTTPException(status_code=404, detail="شما در این رویداد ثبت‌نام نکرده‌اید")
+            raise HTTPException(404, "شما در این رویداد ثبت‌نام نکرده‌اید")
         
         db.delete(registration)
         db.commit()
@@ -1675,7 +1693,7 @@ async def unregister_from_event(event_id: int, current_user: User = Depends(get_
     except Exception as e:
         db.rollback()
         logger.error(f"خطا در حذف ثبت‌نام: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در حذف ثبت‌نام")
+        raise HTTPException(500, "خطای سرور در حذف ثبت‌نام")
 
 # اضافه کردن endpoint جدید برای دریافت رویدادهای ثبت‌نام شده کاربر
 @app.get("/users/{user_id}/registered-events")
@@ -1684,7 +1702,7 @@ async def get_user_registered_events(user_id: int, current_user: User = Depends(
         logger.info(f"دریافت رویدادهای ثبت‌نام شده کاربر {user_id}")
         
         if current_user.id != user_id:
-            raise HTTPException(status_code=403, detail="دسترسی غیرمجاز")
+            raise HTTPException(403, "دسترسی غیرمجاز")
         
         registrations = db.query(EventParticipant).filter(EventParticipant.user_id == user_id).all()
         event_ids = [reg.event_id for reg in registrations]
@@ -1732,7 +1750,7 @@ async def get_user_registered_events(user_id: int, current_user: User = Depends(
         return events_list
     except Exception as e:
         logger.error(f"خطا در دریافت رویدادهای ثبت‌نام شده: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادهای ثبت‌نام شده")
+        raise HTTPException(500, "خطای سرور در دریافت رویدادهای ثبت‌نام شده")
 
 @app.get("/events/{event_id}/participants", response_model=List[EventParticipantResponse])
 async def get_event_participants(event_id: int, db: Session = Depends(get_db)):
@@ -1741,7 +1759,7 @@ async def get_event_participants(event_id: int, db: Session = Depends(get_db)):
         
         event = db.query(Event).filter(Event.id == event_id).first()
         if not event:
-            raise HTTPException(status_code=404, detail="رویداد یافت نشد")
+            raise HTTPException(404, "رویداد یافت نشد")
         
         participants = db.query(EventParticipant).filter(EventParticipant.event_id == event_id).all()
         
@@ -1761,14 +1779,14 @@ async def get_event_participants(event_id: int, db: Session = Depends(get_db)):
         return participants_with_names
     except Exception as e:
         logger.error(f"خطا در دریافت شرکت‌کنندگان: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در دریافت شرکت‌کنندگان")
+        raise HTTPException(500, "خطای سرور در دریافت شرکت‌کنندگان")
 
 @app.get("/users/{user_id}/events")
 async def get_user_events(user_id: int, db: Session = Depends(get_db)):
     try:
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
-            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+            raise HTTPException(404, "کاربر یافت نشد")
         
         registrations = db.query(EventParticipant).filter(EventParticipant.user_id == user_id).all()
         event_ids = [reg.event_id for reg in registrations]
@@ -1808,26 +1826,26 @@ async def get_user_events(user_id: int, db: Session = Depends(get_db)):
         return events_list
     except Exception as e:
         logger.error(f"خطا در دریافت رویدادهای کاربر: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در دریافت رویدادهای کاربر")
+        raise HTTPException(500, "خطای سرور در دریافت رویدادهای کاربر")
 
 # اضافه کردن endpoint برای نوتیفیکیشن‌ها
 @app.get("/users/{user_id}/notifications", response_model=List[NotificationResponse])
 async def get_user_notifications(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         if current_user.id != user_id:
-            raise HTTPException(status_code=403, detail="دسترسی غیرمجاز")
+            raise HTTPException(403, "دسترسی غیرمجاز")
         
         notifications = db.query(Notification).filter(Notification.user_id == user_id).order_by(Notification.created_at.desc()).all()
         return notifications
     except Exception as e:
         logger.error(f"خطا در دریافت نوتیفیکیشن‌ها: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در دریافت نوتیفیکیشن‌ها")
+        raise HTTPException(500, "خطای سرور در دریافت نوتیفیکیشن‌ها")
 
 @app.get("/users/{user_id}/notifications/unread-count")
 async def get_unread_notifications_count(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         if current_user.id != user_id:
-            raise HTTPException(status_code=403, detail="دسترسی غیرمجاز")
+            raise HTTPException(403, "دسترسی غیرمجاز")
         
         unread_count = db.query(Notification).filter(
             Notification.user_id == user_id,
@@ -1837,17 +1855,17 @@ async def get_unread_notifications_count(user_id: int, current_user: User = Depe
         return {"unread_count": unread_count}
     except Exception as e:
         logger.error(f"خطا در دریافت تعداد نوتیفیکیشن‌های خوانده نشده: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در دریافت تعداد نوتیفیکیشن‌ها")
+        raise HTTPException(500, "خطای سرور در دریافت تعداد نوتیفیکیشن‌ها")
 
 @app.put("/notifications/{notification_id}/mark-read")
 async def mark_notification_read(notification_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         notification = db.query(Notification).filter(Notification.id == notification_id).first()
         if not notification:
-            raise HTTPException(status_code=404, detail="نوتیفیکیشن یافت نشد")
+            raise HTTPException(404, "نوتیفیکیشن یافت نشد")
         
         if notification.user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="دسترسی غیرمجاز")
+            raise HTTPException(403, "دسترسی غیرمجاز")
         
         notification.read = True
         db.commit()
@@ -1856,13 +1874,13 @@ async def mark_notification_read(notification_id: int, current_user: User = Depe
     except Exception as e:
         db.rollback()
         logger.error(f"خطا در علامت گذاری نوتیفیکیشن: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در به‌روزرسانی نوتیفیکیشن")
+        raise HTTPException(500, "خطای سرور در به‌روزرسانی نوتیفیکیشن")
 
 @app.put("/users/{user_id}/notifications/mark-all-read")
 async def mark_all_notifications_read(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         if current_user.id != user_id:
-            raise HTTPException(status_code=403, detail="دسترسی غیرمجاز")
+            raise HTTPException(403, "دسترسی غیرمجاز")
         
         db.query(Notification).filter(
             Notification.user_id == user_id,
@@ -1875,7 +1893,7 @@ async def mark_all_notifications_read(user_id: int, current_user: User = Depends
     except Exception as e:
         db.rollback()
         logger.error(f"خطا در علامت گذاری همه نوتیفیکیشن‌ها: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در به‌روزرسانی نوتیفیکیشن‌ها")
+        raise HTTPException(500, "خطای سرور در به‌روزرسانی نوتیفیکیشن‌ها")
 
 # اضافه کردن endpoint برای علاقه‌مندی‌ها
 @app.post("/favorites", response_model=FavoriteResponse)
@@ -1886,12 +1904,12 @@ async def add_to_favorites(favorite: FavoriteCreate, current_user: User = Depend
         # بررسی وجود رویداد
         event = db.query(Event).filter(Event.id == favorite.event_id).first()
         if not event:
-            raise HTTPException(status_code=404, detail="رویداد یافت نشد")
+            raise HTTPException(404, "رویداد یافت نشد")
         
         # بررسی وجود کاربر
         user = db.query(User).filter(User.id == favorite.user_id).first()
         if not user:
-            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+            raise HTTPException(404, "کاربر یافت نشد")
         
         # بررسی آیا قبلاً به علاقه‌مندی اضافه شده
         existing_favorite = db.query(UserFavorite).filter(
@@ -1900,7 +1918,7 @@ async def add_to_favorites(favorite: FavoriteCreate, current_user: User = Depend
         ).first()
         
         if existing_favorite:
-            raise HTTPException(status_code=400, detail="این رویداد قبلاً به علاقه‌مندی‌ها اضافه شده است")
+            raise HTTPException(400, "این رویداد قبلاً به علاقه‌مندی‌ها اضافه شده است")
         
         # ایجاد علاقه‌مندی جدید
         db_favorite = UserFavorite(
@@ -1919,7 +1937,7 @@ async def add_to_favorites(favorite: FavoriteCreate, current_user: User = Depend
     except Exception as e:
         db.rollback()
         logger.error(f"خطا در افزودن به علاقه‌مندی‌ها: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در افزودن به علاقه‌مندی‌ها")
+        raise HTTPException(500, "خطای سرور در افزودن به علاقه‌مندی‌ها")
 
 @app.delete("/favorites/{user_id}/{event_id}")
 async def remove_from_favorites(user_id: int, event_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -1927,7 +1945,7 @@ async def remove_from_favorites(user_id: int, event_id: int, current_user: User 
         logger.info(f"حذف رویداد {event_id} از علاقه‌مندی‌های کاربر {user_id}")
         
         if current_user.id != user_id:
-            raise HTTPException(status_code=403, detail="دسترسی غیرمجاز")
+            raise HTTPException(403, "دسترسی غیرمجاز")
         
         favorite = db.query(UserFavorite).filter(
             UserFavorite.user_id == user_id,
@@ -1935,7 +1953,7 @@ async def remove_from_favorites(user_id: int, event_id: int, current_user: User 
         ).first()
         
         if not favorite:
-            raise HTTPException(status_code=404, detail="این رویداد در علاقه‌مندی‌ها یافت نشد")
+            raise HTTPException(404, "این رویداد در علاقه‌مندی‌ها یافت نشد")
         
         db.delete(favorite)
         db.commit()
@@ -1948,16 +1966,16 @@ async def remove_from_favorites(user_id: int, event_id: int, current_user: User 
     except Exception as e:
         db.rollback()
         logger.error(f"خطا در حذف از علاقه‌مندی‌ها: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در حذف از علاقه‌مندی‌ها")
+        raise HTTPException(500, "خطای سرور در حذف از علاقه‌مندی‌ها")
 
-@app.get("/users/{user_id}/favorites", response_model=List[EventResponse])
+@app.get("/users/{user_id}/favorites", response_model=List[EventResponse)
 async def get_user_favorites(user_id: int, db: Session = Depends(get_db)):
     try:
         logger.info(f"دریافت علاقه‌مندی‌های کاربر {user_id}")
         
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
-            raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+            raise HTTPException(404, "کاربر یافت نشد")
         
         favorites = db.query(UserFavorite).filter(UserFavorite.user_id == user_id).all()
         event_ids = [fav.event_id for fav in favorites]
@@ -2001,7 +2019,7 @@ async def get_user_favorites(user_id: int, db: Session = Depends(get_db)):
         return events_list
     except Exception as e:
         logger.error(f"خطا در دریافت علاقه‌مندی‌ها: {e}")
-        raise HTTPException(status_code=500, detail="خطای سرور در دریافت علاقه‌مندی‌ها")
+        raise HTTPException(500, "خطای سرور در دریافت علاقه‌مندی‌ها")
 
 @app.get("/geocode")
 async def geocode_address(lat: float, lng: float):
