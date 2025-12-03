@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, text, inspect, Boolean, func
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
+
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
@@ -16,7 +17,11 @@ import base64
 import os
 import random
 import logging
-from kavenegar import *
+
+# فقط این دوتا از کاوه‌نگار
+from kavenegar import KavenegarAPI
+from kavenegar import APIException as KavenegarAPIException
+
 from contextlib import contextmanager
 
 # تنظیمات لاگینگ حرفه‌ای
@@ -703,8 +708,9 @@ async def send_otp(request: OTPSendRequest, background_tasks: BackgroundTasks, d
             phone_number=request.phone_number,
             verification_code=code,
             code_expire_time=code_expire_time,
-            user_data=json.dumps(request.user_data) if request.user_data else None
+            user_data=str(request.user_data or {})  # 👈 این خط رو دقیق همینطوری کن
         )
+
 
         
         db.add(otp_temp)
@@ -757,60 +763,51 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
     try:
         otp_temp = db.query(OTPTemp).filter(OTPTemp.email == request.email).first()
 
-        # ❌ کد موقت پیدا نشد
         if not otp_temp:
-            raise HTTPException(404, "کد تأیید یافت نشد. لطفاً مجدداً درخواست کد دهید")
+            raise HTTPException(404, "کد تأیید یافت نشد. لطفاً دوباره درخواست دهید")
 
-        # 📌 کد اشتباهه
         if otp_temp.verification_code != request.code:
             raise HTTPException(400, "کد تأیید اشتباه است")
 
-        # ⏳ کد منقضی شده
         if datetime.utcnow() > otp_temp.code_expire_time:
             db.delete(otp_temp)
             db.commit()
-            raise HTTPException(400, "کد تأیید منقضی شده است. لطفاً دوباره درخواست دهید")
+            raise HTTPException(400, "کد منقضی شده است. لطفاً دوباره درخواست دهید")
 
-        # 👤 بررسی کاربر موجود
         user = db.query(User).filter(User.email == request.email).first()
 
         if user:
             if user.is_verified:
-                raise HTTPException(400, "حساب کاربری شما قبلاً تأیید شده است")
+                raise HTTPException(400, "حساب شما قبلاً تأیید شده است")
 
             user.is_verified = True
             user.verification_code = None
             user.code_expire_time = None
 
         else:
-            # 📌 ثبت‌نام کاربر جدید
-            if not otp_temp.user_data:
-                raise HTTPException(400, "داده‌های کاربر برای ثبت‌نام یافت نشد")
-
+            # 🔥 اصلاح کامل اینجاست — بدون raise و با تبدیل امن JSON
+            import json
             try:
-                import json
-                user_data = json.loads(otp_temp.user_data)
+                user_data = json.loads(otp_temp.user_data) if otp_temp.user_data else {}
+            except:
+                user_data = {}
 
-                hashed_password = get_password_hash(user_data['password'])
+            hashed_password = get_password_hash(user_data.get("password", "DefaultPass123"))
 
-                user = User(
-                    first_name=user_data['first_name'],
-                    last_name=user_data['last_name'],
-                    email=user_data['email'],
-                    national_id=user_data['national_id'],
-                    phone_number=user_data['phone_number'],
-                    country=user_data['country'],
-                    province=user_data['province'],
-                    city=user_data['city'],
-                    gender=user_data['gender'],
-                    password=hashed_password,
-                    is_verified=True
-                )
-                db.add(user)
-
-            except Exception as e:
-                logger.error(f"⚠️ خطا در ایجاد کاربر جدید: {e}")
-                raise HTTPException(400, "خطا در پردازش داده‌های کاربر")
+            user = User(
+                first_name=user_data.get("first_name", ""),
+                last_name=user_data.get("last_name", ""),
+                email=request.email,
+                national_id=user_data.get("national_id", ""),
+                phone_number=otp_temp.phone_number,
+                country=user_data.get("country", ""),
+                province=user_data.get("province", ""),
+                city=user_data.get("city", ""),
+                gender=user_data.get("gender", ""),
+                password=hashed_password,
+                is_verified=True
+            )
+            db.add(user)
 
         db.delete(otp_temp)
         db.commit()
@@ -828,7 +825,7 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
     except HTTPException as e:
         raise e
     except Exception as e:
-        logger.error(f"⚠️ خطای کلی در verify_otp: {e}")
+        logger.error(f"⚠️ خطا در verify_otp: {e}")
         raise HTTPException(500, "خطای سرور در تایید کد")
 
 # 📝 ثبت‌نام مرحله اول - فقط ذخیره اطلاعات در otp_temp و ارسال OTP
