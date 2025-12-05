@@ -3120,23 +3120,18 @@
                 </div>
                 <div class="form-group">
                     <label>روش پرداخت</label>
-                    <div class="payment-methods">
-                        <div class="payment-method" data-method="card">
-                            <i class="fas fa-credit-card"></i>
-                            <span>کارت بانکی</span>
+                    <div class="card-number-display" style="text-align: center; padding: 15px; background: #f8fafc; border-radius: 10px; margin: 15px 0;">
+                        <h4 style="color: var(--dark); margin-bottom: 10px;">شماره کارت برای واریز:</h4>
+                        <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent-2); direction: ltr; letter-spacing: 2px;">
+                            6219 8619 1843 5032
                         </div>
-                        <div class="payment-method" data-method="wallet">
-                            <i class="fas fa-wallet"></i>
-                            <span>کیف پول</span>
-                        </div>
-                        <div class="payment-method" data-method="online">
-                            <i class="fas fa-mobile-alt"></i>
-                            <span>درگاه آنلاین</span>
-                        </div>
+                        <p style="color: var(--muted); margin-top: 10px; font-size: 0.9rem;">
+                            برای پرداخت نذری، مبلغ را به شماره کارت بالا واریز کنید
+                        </p>
                     </div>
                 </div>
                 <div class="button-group">
-                    <button class="btn primary" id="donateBtn">پرداخت نذری</button>
+                    <button class="btn primary" id="donateBtn">ثبت درخواست نذری</button>
                 </div>
             </div>
         </section>
@@ -3299,55 +3294,6 @@
                         <input id="signupPhone" type="tel" placeholder="شماره تماس (09xxxxxxxxx)" pattern="09[0-9]{9}" autocomplete="tel">
                     </div>
                     
-                    <!-- بخش تأیید شماره تلفن -->
-                    <div class="phone-verification" id="phoneVerification" style="display: none;">
-                        <div class="verification-steps">
-                            <div class="verification-step active" id="step1">
-                                <div class="step-number">1</div>
-                                <div class="step-label">شماره</div>
-                            </div>
-                            <div class="verification-step" id="step2">
-                                <div class="step-number">2</div>
-                                <div class="step-label">کد تأیید</div>
-                            </div>
-                            <div class="verification-step" id="step3">
-                                <div class="step-number">3</div>
-                                <div class="step-label">تأیید</div>
-                            </div>
-                        </div>
-                        <div id="verificationStep1">
-                            <div class="form-group">
-                                <label>شماره تلفن شما</label>
-                                <p id="displayPhoneNumber" class="muted"></p>
-                                <button type="button" class="btn primary" id="sendOtpBtn">ارسال کد تأیید</button>
-                            </div>
-                        </div>
-                        <div id="verificationStep2" style="display: none;">
-                            <div class="form-group">
-                                <label>کد تأیید ارسال شده</label>
-                                <div class="otp-container">
-                                    <input type="text" class="otp-input" maxlength="1" data-index="0">
-                                    <input type="text" class="otp-input" maxlength="1" data-index="1">
-                                    <input type="text" class="otp-input" maxlength="1" data-index="2">
-                                    <input type="text" class="otp-input" maxlength="1" data-index="3">
-                                    <input type="text" class="otp-input" maxlength="1" data-index="4">
-                                </div>
-                                <div class="timer" id="otpTimer">02:00</div>
-                                <div class="resend-otp">
-                                    <button type="button" id="resendOtpBtn" disabled>ارسال مجدد کد</button>
-                                </div>
-                                <button type="button" class="btn primary" id="verifyOtpBtn">تأیید کد</button>
-                            </div>
-                        </div>
-                        <div id="verificationStep3" style="display: none;">
-                            <div class="form-group" style="text-align: center;">
-                                <i class="fas fa-check-circle" style="font-size: 3rem; color: var(--success); margin-bottom: 1rem;"></i>
-                                <h3>شماره تلفن شما تأیید شد</h3>
-                                <p class="muted">شما می‌توانید ثبت‌نام خود را تکمیل کنید</p>
-                            </div>
-                        </div>
-                    </div>
-                    
                     <div class="input required">
                         <label for="signupCountry">کشور</label>
                         <select id="signupCountry">
@@ -3401,14 +3347,59 @@
                         <input id="agree" type="checkbox"> با <a href="#" style="color: var(--accent-1); text-decoration: none;">قوانین و محرمانگی</a> موافقم
                     </label>
                     <div class="button-group">
-                        <button class="glass-button primary" id="signupSubmitBtn" type="button" disabled>
-                            <span id="btnIcon">⏳</span>
-                            <span id="btnText">تأیید شماره تلفن الزامی است</span>
+                        <button class="glass-button primary" id="signupSubmitBtn" type="button">
+                            <span id="btnIcon">📝</span>
+                            <span id="btnText">ثبت‌نام</span>
                         </button>
                         <button class="glass-button" type="button" onclick="showTab('login')">وارد شوید</button>
                     </div>
                 </form>
                 <div class="small-note">قبلاً ثبت نام کرده‌اید؟ <a onclick="showTab('login')">ورود</a></div>
+                
+                <!-- بخش OTP - مخفی شده تا زمانی که نیاز باشد -->
+                <div id="phoneVerification" style="display: none; margin-top: 20px;">
+                    <div class="verification-steps">
+                        <div class="verification-step active" id="step1">
+                            <div class="step-number">1</div>
+                            <div class="step-label">ثبت اطلاعات</div>
+                        </div>
+                        <div class="verification-step" id="step2">
+                            <div class="step-number">2</div>
+                            <div class="step-label">تأیید شماره</div>
+                        </div>
+                        <div class="verification-step" id="step3">
+                            <div class="step-number">3</div>
+                            <div class="step-label">تکمیل ثبت‌نام</div>
+                        </div>
+                    </div>
+                    
+                    <div id="verificationStep2">
+                        <div class="form-group">
+                            <label>شماره تلفن شما</label>
+                            <p id="displayPhoneNumber" class="muted"></p>
+                            <div class="otp-container">
+                                <input type="text" class="otp-input" maxlength="1" data-index="0" autocomplete="off">
+                                <input type="text" class="otp-input" maxlength="1" data-index="1" autocomplete="off">
+                                <input type="text" class="otp-input" maxlength="1" data-index="2" autocomplete="off">
+                                <input type="text" class="otp-input" maxlength="1" data-index="3" autocomplete="off">
+                                <input type="text" class="otp-input" maxlength="1" data-index="4" autocomplete="off">
+                            </div>
+                            <div class="timer" id="otpTimer">02:00</div>
+                            <div class="resend-otp">
+                                <button type="button" id="resendOtpBtn" disabled>ارسال مجدد کد</button>
+                            </div>
+                            <button type="button" class="btn primary" id="verifyOtpBtn">تأیید و تکمیل ثبت‌نام</button>
+                        </div>
+                    </div>
+                    
+                    <div id="verificationStep3" style="display: none;">
+                        <div class="form-group" style="text-align: center;">
+                            <i class="fas fa-check-circle" style="font-size: 3rem; color: var(--success); margin-bottom: 1rem;"></i>
+                            <h3>ثبت‌نام شما با موفقیت تکمیل شد!</h3>
+                            <p class="muted">در حال انتقال به صفحه اصلی...</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -3784,7 +3775,7 @@
         let token = localStorage.getItem('token') || null;
         let currentUserId = localStorage.getItem('userId') || null;
         let currentUserData = JSON.parse(localStorage.getItem('userData') || '{}');
-
+        
         // تابع برای ایجاد هدرهای احراز هویت
         function getAuthHeaders() {
             const headers = {
@@ -4293,13 +4284,13 @@
             initialize() {
                 console.log("📱 راه‌اندازی مدیریت OTP");
                 
-                const sendOtpBtn = document.getElementById('sendOtpBtn');
+                const signupSubmitBtn = document.getElementById('signupSubmitBtn');
                 const verifyOtpBtn = document.getElementById('verifyOtpBtn');
                 const resendOtpBtn = document.getElementById('resendOtpBtn');
                 const otpInputs = document.querySelectorAll('.otp-input');
                 
-                if (sendOtpBtn) {
-                    sendOtpBtn.addEventListener('click', this.sendOTP.bind(this));
+                if (signupSubmitBtn) {
+                    signupSubmitBtn.addEventListener('click', this.handleSignup.bind(this));
                 }
                 
                 if (verifyOtpBtn) {
@@ -4325,66 +4316,97 @@
                     });
                 });
                 
-                // فعال کردن بخش تأیید شماره هنگام پر کردن فرم
-                document.getElementById('signupPhone').addEventListener('blur', this.checkPhoneVerification.bind(this));
-                
                 console.log("✅ مدیریت OTP راه‌اندازی شد");
             },
             
-            checkPhoneVerification() {
-                const phone = document.getElementById('signupPhone').value;
-                const email = document.getElementById('signupEmail').value;
-                
-                if (phone && email && phone.length === 11 && phone.startsWith('09')) {
-                    // ابتدا باید تمام فرم پر شود
-                    const firstName = document.getElementById('signupFirstName').value;
-                    const lastName = document.getElementById('signupLastName').value;
-                    const nationalId = document.getElementById('signupNationalId').value;
-                    const country = document.getElementById('signupCountry').value;
-                    const province = document.getElementById('signupProvince').value;
-                    const city = document.getElementById('signupCity').value;
-                    const gender = document.getElementById('signupGender').value;
-                    const password = document.getElementById('signupPassword').value;
-                    const password2 = document.getElementById('signupPassword2').value;
-                    
-                    if (!firstName || !lastName || !nationalId || !country || !province || !city || !gender || !password || !password2) {
-                        showModal('خطا', 'لطفاً تمام فیلدهای فرم را پر کنید.', 'error');
-                        return;
+            async checkPhoneDuplicate(phone) {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/check-phone/${phone}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        return data.exists || false;
                     }
-                    
-                    if (password !== password2) {
-                        showModal('خطا', 'رمز عبور و تکرار آن مطابقت ندارند.', 'error');
-                        return;
-                    }
-                    
-                    if (!document.getElementById('agree').checked) {
-                        showModal('خطا', 'لطفاً با قوانین و مقررات موافقت کنید.', 'error');
-                        return;
-                    }
-                    
-                    document.getElementById('phoneVerification').style.display = 'block';
-                    document.getElementById('displayPhoneNumber').textContent = phone;
-                    this.currentPhone = phone;
-                    this.currentEmail = email;
-                    
-                    // ذخیره داده‌های کاربر
-                    this.currentUserData = {
-                        first_name: firstName,
-                        last_name: lastName,
-                        email: email,
-                        national_id: nationalId,
-                        phone_number: phone,
-                        country: country,
-                        province: province,
-                        city: city,
-                        gender: gender,
-                        password: password
-                    };
+                    return false;
+                } catch (error) {
+                    console.error('خطا در بررسی شماره تلفن:', error);
+                    return false;
                 }
             },
             
+            async handleSignup() {
+                console.log("📝 ثبت‌نام مرحله اول - ارسال OTP");
+                
+                // جمع‌آوری اطلاعات از فرم
+                const firstName = document.getElementById('signupFirstName').value;
+                const lastName = document.getElementById('signupLastName').value;
+                const email = document.getElementById('signupEmail').value;
+                const nationalId = document.getElementById('signupNationalId').value;
+                const phone = document.getElementById('signupPhone').value;
+                const country = document.getElementById('signupCountry').value;
+                const province = document.getElementById('signupProvince').value;
+                const city = document.getElementById('signupCity').value;
+                const gender = document.getElementById('signupGender').value;
+                const password = document.getElementById('signupPassword').value;
+                const password2 = document.getElementById('signupPassword2').value;
+                
+                // اعتبارسنجی فرم
+                if (!firstName || !lastName || !email || !nationalId || !phone || !country || !province || !city || !gender || !password || !password2) {
+                    showModal('خطا', 'لطفاً تمام فیلدهای فرم را پر کنید.', 'error');
+                    return;
+                }
+                
+                if (password !== password2) {
+                    showModal('خطا', 'رمز عبور و تکرار آن مطابقت ندارند.', 'error');
+                    return;
+                }
+                
+                if (!document.getElementById('agree').checked) {
+                    showModal('خطا', 'لطفاً با قوانین و مقررات موافقت کنید.', 'error');
+                    return;
+                }
+                
+                // بررسی اعتبار شماره تلفن
+                if (!phone.startsWith('09') || phone.length !== 11) {
+                    showModal('خطا', 'شماره تلفن باید 11 رقم و با 09 شروع شود.', 'error');
+                    return;
+                }
+                
+                // بررسی اعتبار کد ملی
+                if (nationalId.length !== 10 || !/^\d+$/.test(nationalId)) {
+                    showModal('خطا', 'کد ملی باید 10 رقم باشد.', 'error');
+                    return;
+                }
+                
+                // بررسی اعتبار ایمیل
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    showModal('خطا', 'فرمت ایمیل نامعتبر است.', 'error');
+                    return;
+                }
+                
+                // ذخیره داده‌های کاربر
+                this.currentUserData = {
+                    first_name: firstName,
+                    last_name: lastName,
+                    email: email,
+                    national_id: nationalId,
+                    phone_number: phone,
+                    country: country,
+                    province: province,
+                    city: city,
+                    gender: gender,
+                    password: password
+                };
+                
+                this.currentPhone = phone;
+                this.currentEmail = email;
+                
+                // ارسال OTP
+                await this.sendOTP();
+            },
+            
             async sendOTP() {
-                console.log("📤 ارسال کد OTP");
+                console.log("📤 ارسال کد OTP برای ثبت‌نام");
                 
                 if (!this.currentPhone || !this.currentEmail || !this.currentUserData) {
                     showModal('خطا', 'لطفاً تمام اطلاعات را به درستی وارد کنید.', 'error');
@@ -4408,10 +4430,12 @@
                         const result = await response.json();
                         console.log("✅ OTP ارسال شد:", result);
                         
-                        showModal('ارسال کد', 'کد تأیید به شماره شما ارسال شد.', 'success');
+                        // نمایش بخش OTP
+                        document.getElementById('phoneVerification').style.display = 'block';
+                        document.getElementById('displayPhoneNumber').textContent = this.currentPhone;
                         
-                        // نمایش مرحله دوم
-                        document.getElementById('verificationStep1').style.display = 'none';
+                        // مخفی کردن فرم اصلی و نمایش بخش OTP
+                        document.getElementById('signupForm').style.display = 'none';
                         document.getElementById('verificationStep2').style.display = 'block';
                         
                         // به‌روزرسانی مراحل
@@ -4420,6 +4444,9 @@
                         
                         // شروع تایمر
                         this.startTimer();
+                        
+                        showModal('ارسال کد', 'کد تأیید به شماره شما ارسال شد.', 'success');
+                        
                     } else {
                         const error = await response.json();
                         showModal('خطا', error.detail || 'خطا در ارسال کد تأیید', 'error');
@@ -4431,7 +4458,7 @@
             },
             
             async verifyOTP() {
-                console.log("✅ تأیید کد OTP");
+                console.log("✅ تأیید کد OTP و تکمیل ثبت‌نام");
                 const otpInputs = document.querySelectorAll('.otp-input');
                 let otpCode = '';
                 
@@ -4460,9 +4487,7 @@
                         const result = await response.json();
                         console.log("✅ OTP تأیید شد:", result);
                         
-                        showModal('موفقیت', 'ثبت‌نام شما با موفقیت انجام شد.', 'success');
-                        
-                        // نمایش مرحله سوم
+                        // نمایش مرحله نهایی
                         document.getElementById('verificationStep2').style.display = 'none';
                         document.getElementById('verificationStep3').style.display = 'block';
                         
@@ -4497,6 +4522,7 @@
                         // انتقال به صفحه اصلی بعد از 2 ثانیه
                         setTimeout(() => {
                             navigateTo('homePage');
+                            showModal('موفقیت', 'ثبت‌نام شما با موفقیت انجام شد.', 'success');
                         }, 2000);
                         
                     } else {
@@ -4541,6 +4567,11 @@
                 const seconds = this.timeLeft % 60;
                 document.getElementById('otpTimer').textContent = 
                     `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                
+                // فعال کردن دکمه ارسال مجدد وقتی تایمر تمام شد
+                if (this.timeLeft <= 0) {
+                    document.getElementById('resendOtpBtn').disabled = false;
+                }
             }
         };
 
@@ -4548,7 +4579,6 @@
         const DonationManager = {
             selectedType: null,
             selectedAmount: null,
-            selectedPayment: null,
             
             initialize() {
                 console.log("💰 راه‌اندازی مدیریت نذورات");
@@ -4564,13 +4594,6 @@
                 document.querySelectorAll('.amount-btn').forEach(btn => {
                     btn.addEventListener('click', function() {
                         this.selectAmount(btn);
-                    }.bind(this));
-                });
-                
-                // رویدادهای کلیک برای روش‌های پرداخت
-                document.querySelectorAll('.payment-method').forEach(method => {
-                    method.addEventListener('click', function() {
-                        this.selectPaymentMethod(method);
                     }.bind(this));
                 });
                 
@@ -4618,19 +4641,6 @@
                 console.log(`💰 مبلغ انتخاب شد: ${amount} تومان`);
             },
             
-            selectPaymentMethod(method) {
-                // حذف انتخاب از همه روش‌ها
-                document.querySelectorAll('.payment-method').forEach(meth => {
-                    meth.classList.remove('selected');
-                });
-                
-                // انتخاب روش جدید
-                method.classList.add('selected');
-                this.selectedPayment = method.getAttribute('data-method');
-                
-                console.log(`💳 روش پرداخت انتخاب شد: ${this.selectedPayment}`);
-            },
-            
             setCustomAmount() {
                 const customAmount = document.getElementById('donationAmount').value;
                 if (!customAmount || customAmount < 1000) {
@@ -4649,8 +4659,8 @@
             },
             
             async processDonation() {
-                if (!this.selectedType || !this.selectedAmount || !this.selectedPayment) {
-                    showModal('خطا', 'لطفاً نوع نذری، مبلغ و روش پرداخت را انتخاب کنید.', 'error');
+                if (!this.selectedType || !this.selectedAmount) {
+                    showModal('خطا', 'لطفاً نوع نذری و مبلغ را انتخاب کنید.', 'error');
                     return;
                 }
                 
@@ -4661,44 +4671,37 @@
                     return;
                 }
                 
-                console.log(`🎯 پرداخت نذری: ${this.selectedType}, مبلغ: ${this.selectedAmount}, روش: ${this.selectedPayment}`);
+                console.log(`🎯 پرداخت نذری: ${this.selectedType}, مبلغ: ${this.selectedAmount}`);
                 
+                // شماره کارت ثابت برای نمایش
+                const cardNumber = "6219861918435032";
+                
+                showModal('پرداخت نذری', 
+                    `برای پرداخت نذری، لطفاً مبلغ ${parseFloat(this.selectedAmount).toLocaleString()} تومان را به شماره کارت زیر واریز کنید:\n\n${cardNumber}\n\nپس از واریز، رسید پرداخت را برای ما ارسال کنید.`, 
+                    'success'
+                );
+                
+                // ثبت درخواست در سرور
                 try {
-                    // ارسال درخواست پرداخت به سرور
-                    const response = await fetch(`${API_BASE_URL}/donations/pay`, {
+                    const response = await fetch(`${API_BASE_URL}/donations/make-donation`, {
                         method: 'POST',
                         headers: getAuthHeaders(),
                         body: JSON.stringify({
                             donation_type: this.getDonationTypeName(this.selectedType),
                             amount: parseFloat(this.selectedAmount),
-                            payment_method: this.selectedPayment
+                            payment_method: 'card'
                         })
                     });
                     
                     if (response.ok) {
-                        const result = await response.json();
-                        
-                        // نمایش شماره کارت
-                        const cardNumber = "6219861918435032";
-                        
-                        showModal('پرداخت نذری', 
-                            `برای پرداخت نذری، لطفاً مبلغ ${parseFloat(this.selectedAmount).toLocaleString()} تومان را به شماره کارت زیر واریز کنید:\n\n${cardNumber}\n\nپس از واریز، رسید پرداخت را برای ما ارسال کنید.`, 
-                            'success'
-                        );
-                        
                         // ایجاد نوتیفیکیشن
                         NotificationManager.loadNotifications();
                         
                         // ریست فرم
                         this.resetDonationForm();
-                        
-                    } else {
-                        const error = await response.json();
-                        showModal('خطا', error.detail || 'خطا در پرداخت نذری', 'error');
                     }
                 } catch (error) {
-                    console.error("❌ خطا در پرداخت نذری:", error);
-                    showModal('خطا', 'خطا در ارتباط با سرور', 'error');
+                    console.error("❌ خطا در ثبت درخواست نذری:", error);
                 }
             },
             
@@ -4721,15 +4724,10 @@
                     btn.classList.remove('selected');
                 });
                 
-                document.querySelectorAll('.payment-method').forEach(method => {
-                    method.classList.remove('selected');
-                });
-                
                 document.getElementById('donationAmount').value = '';
                 
                 this.selectedType = null;
                 this.selectedAmount = null;
-                this.selectedPayment = null;
             }
         };
 
