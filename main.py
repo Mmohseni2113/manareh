@@ -20,7 +20,7 @@ import logging
 
 # فقط این دوتا از کاوه‌نگار
 from kavenegar import KavenegarAPI
-from kavenegar import APIException as KavenegarAPIException
+from kavenegar import APIException  # اضافه کردن import صحیح
 
 from contextlib import contextmanager
 
@@ -607,9 +607,7 @@ class SMSService:
             logger.error(f"⚠️ خطای ناشناخته در ارسال پیامک به {phone_number}: {e}")
             return False
 
-
 sms_service = SMSService()
-
 
 # بررسی تکراری بودن ایمیل و شماره تلفن
 async def check_duplicate_user(email: str, national_id: str, phone_number: str, db: Session) -> None:
@@ -637,18 +635,9 @@ async def check_duplicate_user(email: str, national_id: str, phone_number: str, 
             detail="این شماره تلفن قبلاً ثبت شده است"
         )
 
-# تابع برای ارسال پیامک در پس‌زمینه
-async def send_verification_sms_task(phone_number: str, code: str):
-    """
-    تابع برای ارسال پیامک تأیید در پس‌زمینه
-    """
-    success = await sms_service.send_verification_code(phone_number, code)
-    if not success:
-        logger.warning(f"ارسال پیامک به {phone_number} ناموفق بود، اما کد در سیستم ذخیره شد")
-
 # 📤 ارسال OTP - کاملاً اصلاح شده
 @app.post("/send-otp")
-async def send_otp(request: OTPSendRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+async def send_otp(request: OTPSendRequest, db: Session = Depends(get_db)):
     """
     ارسال کد تأیید به شماره تلفن کاربر
     این endpoint هم برای کاربران موجود و هم برای ثبت‌نام جدید کار می‌کند
@@ -708,35 +697,30 @@ async def send_otp(request: OTPSendRequest, background_tasks: BackgroundTasks, d
             phone_number=request.phone_number,
             verification_code=code,
             code_expire_time=code_expire_time,
-            user_data=str(request.user_data or {})  # 👈 این خط رو دقیق همینطوری کن
+            user_data=json.dumps(request.user_data) if request.user_data else '{}'
         )
 
-
-        
         db.add(otp_temp)
         db.commit()
         
         logger.info(f"کد تأیید {code} برای {request.email} تولید و در otp_temp ذخیره شد")
         
-        # ارسال پیامک در background
+        # ارسال پیامک
         try:
             success = await sms_service.send_verification_code(request.phone_number, code)
             if not success:
                 logger.error(f"خطا در ارسال پیامک به {request.phone_number}")
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="سرویس ارسال پیامک در دسترس نیست. لطفاً稍后再试"
+                    detail="سرویس ارسال پیامک در دسترس نیست. لطفاً دوباره تلاش کنید"
                 )
             
             logger.info(f"پیامک با کد {code} به شماره {request.phone_number} ارسال شد")
             
-            return JSONResponse(
-                status_code=200,
-                content={
-                    "message": "کد تأیید با موفقیت ارسال شد",
-                    "debug_code": code  # فقط برای محیط توسعه
-                }
-            )
+            return {
+                "message": "کد تأیید با موفقیت ارسال شد",
+                "debug_code": code  # فقط برای محیط توسعه
+            }
             
         except HTTPException:
             raise
@@ -783,9 +767,11 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
             user.is_verified = True
             user.verification_code = None
             user.code_expire_time = None
+            db.commit()
+            db.refresh(user)
 
         else:
-            # 🔥 اصلاح کامل اینجاست — بدون raise و با تبدیل امن JSON
+            # ایجاد کاربر جدید
             import json
             try:
                 user_data = json.loads(otp_temp.user_data) if otp_temp.user_data else {}
@@ -808,10 +794,12 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
                 is_verified=True
             )
             db.add(user)
+            db.commit()
+            db.refresh(user)
 
+        # حذف OTP موقت
         db.delete(otp_temp)
         db.commit()
-        db.refresh(user)
 
         access_token = create_access_token(data={"sub": user.email})
 
@@ -905,29 +893,37 @@ async def signup_step1(user: SignupStep1Request, db: Session = Depends(get_db)):
             'password': user.password
         }
         
-        # ارسال درخواست OTP با داده‌های کاربر
-        otp_request = OTPSendRequest(
+        # تولید و ذخیره OTP
+        code = str(random.randint(10000, 99999))
+        code_expire_time = datetime.utcnow() + timedelta(minutes=2)
+        
+        # حذف کدهای قبلی
+        db.query(OTPTemp).filter(OTPTemp.email == user.email).delete()
+        
+        # ذخیره کد جدید
+        import json
+        otp_temp = OTPTemp(
             email=user.email,
             phone_number=user.phone_number,
-            user_data=user_data
+            verification_code=code,
+            code_expire_time=code_expire_time,
+            user_data=json.dumps(user_data)
         )
+        db.add(otp_temp)
+        db.commit()
         
-        # استفاده از endpoint ارسال OTP
-        from fastapi.testclient import TestClient
-        client = TestClient(app)
-        
-        response = client.post("/send-otp", json=otp_request.dict())
-        
-        if response.status_code != 200:
+        # ارسال پیامک
+        success = await sms_service.send_verification_code(user.phone_number, code)
+        if not success:
             raise HTTPException(
-                status_code=response.status_code,
-                detail=response.json().get('detail', 'خطا در ارسال کد تأیید')
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="سرویس ارسال پیامک در دسترس نیست"
             )
         
         logger.info(f"اطلاعات کاربر در otp_temp ذخیره شد و OTP ارسال شد: {user.email}")
         
         return SignupStep1Response(
-            message="اطلاعات شما با موفقیت ثبت شد. لطفاً شماره تلفن خود را با کد ارسال شده تأیید کنید.",
+            message="کد تأیید به شماره تلفن شما ارسال شد. لطفاً کد را وارد کنید.",
             email=user.email,
             phone_number=user.phone_number,
             requires_verification=True
@@ -942,6 +938,78 @@ async def signup_step1(user: SignupStep1Request, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"خطای سرور در ثبت‌نام: {str(e)}"
+        )
+
+# 🎯 اضافه کردن endpoint جدید برای دریافت اطلاعات کاربر با ایمیل
+@app.get("/user-by-email/{email}")
+async def get_user_by_email(email: str, db: Session = Depends(get_db)):
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="کاربر یافت نشد"
+            )
+        
+        return {
+            "id": user.id,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "phone_number": user.phone_number
+        }
+    except Exception as e:
+        logger.error(f"خطا در دریافت اطلاعات کاربر: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="خطای سرور در دریافت اطلاعات کاربر"
+        )
+
+# 🎯 اضافه کردن endpoint برای پرداخت نذورات
+@app.post("/donations/make-donation")
+async def make_donation(
+    donation_type: str = Query(...),
+    amount: float = Query(...),
+    payment_method: str = Query(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    endpoint برای پرداخت نذورات - فقط نمایش شماره کارت
+    """
+    try:
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="برای پرداخت نذری باید وارد شوید"
+            )
+        
+        # شماره کارت برای پرداخت
+        card_number = "6219861918435032"
+        
+        # ایجاد نوتیفیکیشن
+        notification = Notification(
+            user_id=current_user.id,
+            title="درخواست پرداخت نذری",
+            message=f"برای پرداخت {amount} تومان نذری {donation_type}، مبلغ را به شماره کارت {card_number} واریز کنید.",
+            type="donation"
+        )
+        db.add(notification)
+        db.commit()
+        
+        return {
+            "message": "برای پرداخت نذری، مبلغ را به شماره کارت زیر واریز کنید",
+            "card_number": card_number,
+            "amount": amount,
+            "donation_type": donation_type,
+            "note": "پس از واریز، رسید پرداخت را برای ما ارسال کنید."
+        }
+        
+    except Exception as e:
+        logger.error(f"خطا در پرداخت نذری: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="خطای سرور در پرداخت نذری"
         )
 
 # بقیه endpointها بدون تغییر باقی می‌مانند...
@@ -1794,6 +1862,7 @@ async def get_user_events(user_id: int, db: Session = Depends(get_db)):
                 detail="کاربر یافت نشد"
             )
         
+        # دریافت رویدادهایی که کاربر در آنها ثبت‌نام کرده
         registrations = db.query(EventParticipant).filter(EventParticipant.user_id == user_id).all()
         event_ids = [reg.event_id for reg in registrations]
         
@@ -2178,6 +2247,50 @@ async def test_db(db: Session = Depends(get_db)):
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow()}
+
+# 🎯 اضافه کردن endpoint برای پرداخت نذورات (ورژن ساده)
+@app.post("/donations/pay")
+async def pay_donation(
+    donation_type: str = Query(...),
+    amount: float = Query(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="برای پرداخت باید وارد شوید"
+            )
+        
+        # شماره کارت برای پرداخت
+        card_number = "6219861918435032"
+        
+        # ثبت درخواست پرداخت
+        notification = Notification(
+            user_id=current_user.id,
+            title="درخواست پرداخت نذری",
+            message=f"برای پرداخت {amount:,} تومان نذری {donation_type}، لطفاً مبلغ را به شماره کارت {card_number} واریز کنید.",
+            type="donation"
+        )
+        db.add(notification)
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "برای پرداخت نذری، مبلغ را به شماره کارت زیر واریز کنید",
+            "card_number": card_number,
+            "amount": amount,
+            "donation_type": donation_type,
+            "note": "پس از واریز، رسید پرداخت را برای ما ارسال کنید."
+        }
+        
+    except Exception as e:
+        logger.error(f"خطا در پرداخت نذری: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="خطای سرور در پرداخت نذری"
+        )
 
 @app.on_event("startup")
 async def startup_event():
