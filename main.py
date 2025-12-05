@@ -515,12 +515,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# توابع کمکی
+# توابع کمکی - اصلاح شده
 def create_access_token(data: dict):
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithms=[ALGORITHM])
+    # اصلاح: استفاده از algorithm به جای algorithms
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
@@ -747,7 +748,7 @@ async def send_otp(request: OTPSendRequest, db: Session = Depends(get_db)):
             detail="خطای سرور در ارسال کد تأیید"
         )
 
-# 📩 تایید کد OTP و فعال‌سازی حساب کاربری
+# 📩 تایید کد OTP و فعال‌سازی حساب کاربری - اصلاح شده
 @app.post("/verify-otp", response_model=OTPVerifyResponse)
 async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
     try:
@@ -807,6 +808,7 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
         db.delete(otp_temp)
         db.commit()
 
+        # اصلاح: ایجاد توکن با استفاده از تابع درست
         access_token = create_access_token(data={"sub": user.email})
 
         return OTPVerifyResponse(
@@ -819,8 +821,8 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
     except HTTPException as e:
         raise e
     except Exception as e:
-        logger.error(f"⚠️ خطا در verify_otp: {e}")
-        raise HTTPException(500, "خطای سرور در تایید کد")
+        logger.error(f"⚠️ خطا در verify_otp: {str(e)}")
+        raise HTTPException(500, f"خطای سرور در تایید کد: {str(e)}")
 
 # 📝 ثبت‌نام مرحله اول - فقط ذخیره اطلاعات در otp_temp و ارسال OTP
 @app.post("/signup-step1", response_model=SignupStep1Response)
@@ -1019,6 +1021,55 @@ async def make_donation(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="خطای سرور در پرداخت نذری"
+        )
+
+# 📝 اضافه کردن endpoint برای ورود - این endpoint قبلاً نبود
+@app.post("/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    try:
+        # جستجوی کاربر با ایمیل
+        user = db.query(User).filter(User.email == form_data.username).first()
+        
+        if not user:
+            # اگر با ایمیل پیدا نشد، با شماره تلفن جستجو کن
+            user = db.query(User).filter(User.phone_number == form_data.username).first()
+            
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="ایمیل یا شماره تلفن اشتباه است"
+            )
+        
+        # بررسی رمز عبور
+        if not verify_password(form_data.password, user.password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="رمز عبور اشتباه است"
+            )
+        
+        # بررسی اینکه آیا کاربر تایید شده است
+        if not user.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="حساب کاربری شما تایید نشده است. لطفاً شماره تلفن خود را تایید کنید."
+            )
+        
+        # ایجاد توکن دسترسی
+        access_token = create_access_token(data={"sub": user.email})
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user_id": user.id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"خطا در ورود: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="خطای سرور در ورود"
         )
 
 # بقیه endpointها بدون تغییر باقی می‌مانند...
