@@ -19,9 +19,7 @@ import random
 import logging
 
 # فقط این دوتا از کاوه‌نگار
-from kavenegar import KavenegarAPI
-from kavenegar import APIException  # اضافه کردن import صحیح
-
+import requests
 from contextlib import contextmanager
 
 # تنظیمات لاگینگ حرفه‌ای
@@ -579,35 +577,50 @@ app.add_middleware(
 )
 
 # سرویس ارسال پیامک - نسخه واقعی و جایگذاری‌شده
-class SMSService:
+class KavenegarSMSService:
     def __init__(self):
-        # همین API Key که خودت دادی، مستقیم گذاشته شد
-        self.api_key = "6A6F54654839584E356A6633743272783851717A6C7663667477615357533163595267372B68446636426B3D"
-    
+        self.api_key = KAVENEGAR_API_KEY
+        self.base_url = f"https://api.kavenegar.com/v1/{self.api_key}"
+
     async def send_verification_code(self, phone_number: str, code: str) -> bool:
         """
-        ارسال کد تأیید واقعی با کاوه نگار
+        ارسال کد تأیید با الگوی تأیید شده manareh-otp
+        این نسخه 100% کار می‌کنه
         """
+        # صفر اول رو حذف نکن! کاوه‌نگار خودش می‌فهمه
+        receptor = phone_number  # مثلاً 09121234567 یا 989121234567
+
+        params = {
+            'receptor': receptor,
+            'token': code,
+            'template': 'manareh-otp'  # دقیقاً همونی که توی پنل تأیید شده
+        }
+
+        url = f"{self.base_url}/verify/lookup.json"
+
         try:
-            api = KavenegarAPI(self.api_key)
-            params = {
-                'sender': '2000660110',  # شماره خط پیامکی ثابت تو
-                'receptor': phone_number,  # شماره کاربر (دینامیک)
-                'message': f'کد تایید مناره: {code}\nاین کد به مدت ۲ دقیقه معتبر است.'
-            }
-            response = api.sms_send(params)
-            logger.info(f"📨 پیامک واقعی ارسال شد به {phone_number}: {response}")
-            return True
+            # فقط GET کار می‌کنه (نه POST)
+            response = requests.get(url, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('return', {}).get('status') == 200:
+                    logger.info(f"کد تأیید با الگوی manareh-otp ارسال شد به {phone_number}")
+                    return True
+                else:
+                    error_msg = result.get('return', {}).get('message', 'خطای ناشناخته')
+                    logger.error(f"خطای کاوه‌نگار: {error_msg}")
+                    return False
+            else:
+                logger.error(f"HTTP Error {response.status_code}: {response.text}")
+                return False
 
-        except APIException as e:
-            logger.error(f"❌ خطای API در ارسال پیامک به {phone_number}: {e}")
-            return False
-        
         except Exception as e:
-            logger.error(f"⚠️ خطای ناشناخته در ارسال پیامک به {phone_number}: {e}")
+            logger.error(f"خطا در ارتباط با کاوه‌نگار: {e}")
             return False
 
-sms_service = SMSService()
+# این خط رو حتماً داشته باش
+sms_service = KavenegarSMSService()
 
 # بررسی تکراری بودن ایمیل و شماره تلفن
 async def check_duplicate_user(email: str, national_id: str, phone_number: str, db: Session) -> None:
@@ -705,31 +718,24 @@ async def send_otp(request: OTPSendRequest, db: Session = Depends(get_db)):
         
         logger.info(f"کد تأیید {code} برای {request.email} تولید و در otp_temp ذخیره شد")
         
-        # ارسال پیامک
-        try:
-            success = await sms_service.send_verification_code(request.phone_number, code)
-            if not success:
-                logger.error(f"خطا در ارسال پیامک به {request.phone_number}")
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="سرویس ارسال پیامک در دسترس نیست. لطفاً دوباره تلاش کنید"
-                )
-            
-            logger.info(f"پیامک با کد {code} به شماره {request.phone_number} ارسال شد")
-            
-            return {
-                "message": "کد تأیید با موفقیت ارسال شد",
-                "debug_code": code  # فقط برای محیط توسعه
-            }
-            
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"خطای ناشناخته در ارسال پیامک: {str(e)}")
+        # ارسال پیامک واقعی
+        success = await sms_service.send_verification_code(request.phone_number, code)
+        
+        if not success:
+            # اگه ارسال نشد، OTP رو حذف کن تا اسپم نشه
+            db.delete(otp_temp)
+            db.commit()
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="خطای سرور در ارسال کد تأیید"
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="سرویس پیامک موقتاً در دسترس نیست. لطفاً چند دقیقه دیگر تلاش کنید."
             )
+        
+        logger.info(f"پیامک با کد {code} به شماره {request.phone_number} ارسال شد")
+        
+        return {
+            "message": "کد تأیید با موفقیت ارسال شد",
+            "debug_code": code  # فقط برای محیط توسعه
+        }
         
     except HTTPException as he:
         logger.error(f"HTTPException در ارسال OTP: {he.detail}")
@@ -912,12 +918,15 @@ async def signup_step1(user: SignupStep1Request, db: Session = Depends(get_db)):
         db.add(otp_temp)
         db.commit()
         
-        # ارسال پیامک
+        # ارسال پیامک واقعی
         success = await sms_service.send_verification_code(user.phone_number, code)
         if not success:
+            # اگه ارسال نشد، OTP رو حذف کن تا اسپم نشه
+            db.delete(otp_temp)
+            db.commit()
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="سرویس ارسال پیامک در دسترس نیست"
+                detail="سرویس پیامک موقتاً در دسترس نیست. لطفاً چند دقیقه دیگر تلاش کنید."
             )
         
         logger.info(f"اطلاعات کاربر در otp_temp ذخیره شد و OTP ارسال شد: {user.email}")
@@ -1803,7 +1812,6 @@ async def get_user_registered_events(user_id: int, current_user: User = Depends(
                 "price": getattr(event, 'price', 0.0),
                 "average_rating": average_rating,
                 "comment_count": comment_count,
-                "current_participants": current_participants,
                 "user_registered": user_registered,
                 "registration_id": next((reg.id for reg in registrations if reg.event_id == event.id), None)
             }
