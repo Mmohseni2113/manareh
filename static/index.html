@@ -1848,12 +1848,14 @@
             opacity: 1;
         }
 
-        /* استایل‌های جدید برای OTP */
+        /* استایل‌های جدید برای OTP - اصلاح شده */
         .otp-container {
             display: flex;
             gap: 10px;
             justify-content: center;
             margin: 15px 0;
+            direction: ltr;
+            justify-content: flex-end;
         }
 
         .otp-input {
@@ -1865,6 +1867,7 @@
             border-radius: 8px;
             background: white;
             transition: all 0.3s ease;
+            direction: ltr;
         }
 
         .otp-input:focus {
@@ -2603,6 +2606,186 @@
             color: var(--gray);
         }
 
+        /* استایل‌های جدید برای شماره تلفن */
+        .phone-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .phone-prefix-select {
+            flex: 0 0 80px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(15,23,36,0.06);
+            background: rgba(255,255,255,0.9);
+            font-size: 14px;
+        }
+
+        .phone-number-input {
+            flex: 1;
+        }
+
+        /* استایل‌های جدید برای مودال کد ملی */
+        .national-id-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .national-id-modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .national-id-modal-content h3 {
+            margin-bottom: 15px;
+            color: var(--dark);
+            font-size: 18px;
+        }
+
+        .national-id-modal-content p {
+            margin-bottom: 20px;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .national-id-input {
+            width: 100%;
+            padding: 12px 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(15,23,36,0.1);
+            font-size: 16px;
+            text-align: center;
+            margin-bottom: 20px;
+            direction: ltr;
+        }
+
+        .national-id-input:focus {
+            border-color: var(--accent-2);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+        }
+
+        /* استایل‌های جدید برای قوانین و حریم خصوصی */
+        .terms-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .terms-modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .terms-modal-content h2 {
+            text-align: center;
+            margin-bottom: 25px;
+            color: var(--dark);
+            font-size: 22px;
+        }
+
+        .terms-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #f1f1f1;
+            padding-bottom: 10px;
+        }
+
+        .terms-tab {
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .terms-tab.active {
+            background: var(--accent-2);
+            color: white;
+        }
+
+        .terms-content {
+            font-size: 14px;
+            line-height: 1.8;
+            color: var(--dark);
+        }
+
+        .terms-content h3 {
+            margin: 20px 0 10px;
+            color: var(--accent-1);
+            font-size: 16px;
+        }
+
+        .terms-content p {
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+
+        .terms-content ul {
+            margin-right: 20px;
+            margin-bottom: 15px;
+        }
+
+        .terms-content li {
+            margin-bottom: 8px;
+        }
+
+        .terms-agree {
+            margin-top: 25px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid rgba(15,23,36,0.1);
+        }
+
+        .terms-agree input {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent-2);
+        }
+
+        .terms-agree label {
+            font-size: 14px;
+            color: var(--dark);
+            cursor: pointer;
+        }
+
         @media (max-width: 1200px) {
             .hero-content {
                 flex-direction: column;
@@ -2659,7 +2842,8 @@
                 font-size: 1.8rem;
             }
             .glass-form {
-                padding: 0.5rem;
+                padding: 1rem;
+                max-width: 90%;
             }
             .button-group {
                 flex-direction: column;
@@ -2672,14 +2856,16 @@
             .auth-container {
                 margin-top: 0.5rem;
                 padding: 0.3rem;
+                width: 100%;
             }
             .auth-hero {
                 margin-top: 0.3rem;
                 margin-bottom: 0.3rem;
             }
             .auth-card {
-                padding: 0.5rem;
-                max-width: 22rem;
+                padding: 1rem;
+                max-width: 100%;
+                width: 100%;
             }
             .filters {
                 flex-direction: column;
@@ -2730,35 +2916,48 @@
             .my-event-actions {
                 flex-direction: column;
             }
+            .phone-input-group {
+                flex-direction: column;
+            }
+            .phone-prefix-select {
+                width: 100%;
+                flex: 1;
+            }
+            .phone-number-input {
+                width: 100%;
+            }
         }
     
         @media (max-width: 480px) {
             .glass-form {
-                padding: 0.4rem;
+                padding: 0.8rem;
                 margin: 0.4rem;
-                max-width: 20rem;
+                max-width: 100%;
             }
             .glass-form input, .glass-form textarea, .glass-form select {
-                font-size: 0.65rem;
-                padding: 0.3rem 0.5rem;
+                font-size: 16px;
+                padding: 12px 15px;
+                margin-bottom: 15px;
             }
             .glass-button {
                 width: 100%;
-                margin: 0.2rem 0;
-                padding: 0.3rem;
-                font-size: 0.65rem;
+                margin: 0.5rem 0;
+                padding: 12px;
+                font-size: 16px;
             }
             .auth-container {
-                margin-top: 0.3rem;
-                padding: 0.2rem;
+                margin-top: 0.5rem;
+                padding: 0.5rem;
+                width: 100%;
             }
             .auth-hero {
-                margin-top: 0.2rem;
-                margin-bottom: 0.2rem;
+                margin-top: 0.5rem;
+                margin-bottom: 0.5rem;
             }
             .auth-card {
-                padding: 0.4rem;
+                padding: 1rem;
                 max-width: 100%;
+                width: 100%;
             }
             .hero-text h1 {
                 font-size: 1.875rem;
@@ -2776,48 +2975,87 @@
                 font-size: 1.5rem;
             }
             .auth-card h2 {
-                font-size: 0.9rem;
+                font-size: 1.2rem;
             }
             .auth-card p {
-                font-size: 0.6rem;
-            }
-            .auth-icon {
-                width: 1.8rem;
-                height: 1.8rem;
                 font-size: 0.9rem;
             }
+            .auth-icon {
+                width: 3rem;
+                height: 3rem;
+                font-size: 1.5rem;
+            }
             .auth-card .input label {
-                font-size: 0.6rem;
+                font-size: 14px;
             }
             .auth-card .form-row {
-                gap: 0.3rem;
-                margin-bottom: 0.3rem;
+                gap: 10px;
+                margin-bottom: 15px;
+            }
+            .auth-card input, .auth-card select {
+                font-size: 16px;
+                padding: 12px 15px;
+                margin-bottom: 15px;
             }
             .checkbox {
-                font-size: 0.6rem;
-                gap: 0.3rem;
+                font-size: 14px;
+                gap: 8px;
+                margin: 15px 0;
             }
             .checkbox input {
-                width: 0.7rem;
-                height: 0.7rem;
+                width: 18px;
+                height: 18px;
             }
             .link-small {
-                font-size: 0.6rem;
+                font-size: 14px;
+                margin: 15px 0;
             }
             .small-note {
-                font-size: 0.6rem;
+                font-size: 14px;
             }
             .otp-input {
-                width: 35px;
-                height: 35px;
-                font-size: 16px;
+                width: 45px;
+                height: 45px;
+                font-size: 20px;
+            }
+            .otp-container {
+                gap: 8px;
+                justify-content: center;
             }
             .time-input-container {
                 flex-wrap: wrap;
                 justify-content: center;
             }
             .time-input {
-                width: 50px;
+                width: 60px;
+                font-size: 16px;
+                padding: 10px;
+            }
+            .phone-input-group {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .phone-prefix-select, .phone-number-input input {
+                width: 100%;
+                font-size: 16px;
+                padding: 12px;
+            }
+        }
+
+        /* استایل‌های ریسپانسیو برای موبایل */
+        @media (max-width: 360px) {
+            .otp-input {
+                width: 40px;
+                height: 40px;
+                font-size: 18px;
+            }
+            
+            .auth-card {
+                padding: 15px;
+            }
+            
+            .terms-modal-content {
+                padding: 20px;
             }
         }
     </style>
@@ -2828,6 +3066,72 @@
         <i class="fas fa-arrow-right"></i>
         برگشت
     </button>
+
+    <!-- مودال کد ملی -->
+    <div class="national-id-modal" id="nationalIdModal">
+        <div class="national-id-modal-content">
+            <h3>ثبت کد ملی</h3>
+            <p>برای ادامه، لطفاً کد ملی خود را وارد کنید.</p>
+            <input type="text" id="nationalIdInput" class="national-id-input" maxlength="10" placeholder="کد ملی (10 رقم)" pattern="[0-9]{10}" />
+            <div class="button-group">
+                <button class="btn primary" onclick="submitNationalId()">ثبت کد ملی</button>
+                <button class="btn ghost" onclick="hideNationalIdModal()">انصراف</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- مودال قوانین و حریم خصوصی -->
+    <div class="terms-modal" id="termsModal">
+        <div class="terms-modal-content">
+            <h2>قوانین و حریم خصوصی</h2>
+            <div class="terms-tabs">
+                <button class="terms-tab active" data-tab="terms">قوانین و مقررات</button>
+                <button class="terms-tab" data-tab="privacy">حریم خصوصی</button>
+            </div>
+            <div class="terms-content">
+                <div id="termsContent">
+                    <h3>قوانین و مقررات استفاده از پلتفرم مناره</h3>
+                    <p>با استفاده از پلتفرم مناره، شما با قوانین و مقررات زیر موافقت می‌کنید:</p>
+                    <ul>
+                        <li>کاربران باید اطلاعات صحیح و معتبر در هنگام ثبت‌نام ارائه دهند.</li>
+                        <li>مسئولیت هرگونه فعالیت از حساب کاربری بر عهده صاحب حساب است.</li>
+                        <li>هرگونه سوءاستفاده از پلتفرم منجر به مسدود شدن حساب می‌شود.</li>
+                        <li>کاربران باید قوانین جمهوری اسلامی ایران را رعایت کنند.</li>
+                        <li>پلتفرم مناره حق تغییر قوانین را با اطلاع‌رسانی قبلی محفوظ می‌دارد.</li>
+                        <li>کاربران موظفند از پلتفرم تنها برای اهداف قانونی استفاده کنند.</li>
+                        <li>هرگونه تبلیغات غیرقانونی یا مخالف با شئونات اسلامی ممنوع است.</li>
+                        <li>احترام به حقوق دیگر کاربران و حریم خصوصی آنان الزامی است.</li>
+                        <li>کاربران نباید اطلاعات نادرست در پلتفرم منتشر کنند.</li>
+                        <li>پلتفرم مناره مسئولیتی در قبال رویدادهای برگزار شده توسط کاربران ندارد.</li>
+                    </ul>
+                </div>
+                <div id="privacyContent" style="display: none;">
+                    <h3>سیاست حریم خصوصی</h3>
+                    <p>حریم خصوصی شما برای ما بسیار مهم است. در اینجا نحوه جمع‌آوری، استفاده و محافظت از اطلاعات شما را توضیح می‌دهیم:</p>
+                    <ul>
+                        <li>اطلاعات شخصی کاربران نزد ما محفوظ است و در اختیار اشخاص ثالث قرار نمی‌گیرد.</li>
+                        <li>از اطلاعات کاربران تنها برای بهبود خدمات و ارتباط با کاربران استفاده می‌شود.</li>
+                        <li>در صورت درخواست مقامات قضائی، اطلاعات کاربران ارائه خواهد شد.</li>
+                        <li>کاربران می‌توانند درخواست حذف حساب کاربری خود را ارسال کنند.</li>
+                        <li>اطلاعات پرداختی کاربران به صورت امن ذخیره می‌شود.</li>
+                        <li>پلتفرم مناره از تکنولوژی‌های امنیتی برای محافظت از اطلاعات استفاده می‌کند.</li>
+                        <li>کاربران می‌توانند تنظیمات حریم خصوصی خود را در پنل کاربری مدیریت کنند.</li>
+                        <li>کوکی‌ها برای بهبود تجربه کاربری استفاده می‌شوند.</li>
+                        <li>اطلاعات آمارگیری به صورت ناشناس جمع‌آوری می‌شود.</li>
+                        <li>در صورت تغییر سیاست‌های حریم خصوصی، به کاربران اطلاع‌رسانی خواهد شد.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="terms-agree">
+                <input type="checkbox" id="agreeTerms">
+                <label for="agreeTerms">با قوانین و مقررات و سیاست حریم خصوصی موافقم</label>
+            </div>
+            <div class="button-group" style="margin-top: 20px;">
+                <button class="btn primary" onclick="acceptTerms()">تأیید و ادامه</button>
+                <button class="btn ghost" onclick="hideTermsModal()">بازگشت</button>
+            </div>
+        </div>
+    </div>
 
     <header>
         <div class="container">
@@ -2867,32 +3171,6 @@
         </div>
         <div class="notifications-list" id="notificationsList">
             <!-- اطلاع‌رسانی‌ها اینجا نمایش داده می‌شوند -->
-        </div>
-    </div>
-
-    <!-- ویجت پشتیبانی جدید -->
-    <div class="support-widget" id="supportWidget">
-        <button class="support-btn" id="supportBtn">
-            <i class="fas fa-headset"></i>
-        </button>
-        <div class="chat-window" id="chatWindow">
-            <div class="chat-header">
-                <span>پشتیبانی آنلاین</span>
-                <button class="btn ghost" id="closeChat">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="chat-messages" id="chatMessages">
-                <div class="message system">
-                    <p>به پشتیبانی مناره خوش آمدید. چگونه می‌توانیم کمک کنیم؟</p>
-                </div>
-            </div>
-            <div class="chat-input">
-                <input type="text" id="chatInput" placeholder="پیام خود را بنویسید...">
-                <button class="btn primary" id="sendMessage">
-                    <i class="fas fa-paper-plane"></i>
-                </button>
-            </div>
         </div>
     </div>
 
@@ -3285,13 +3563,30 @@
                         <label for="signupEmail">ایمیل</label>
                         <input id="signupEmail" type="email" placeholder="ایمیل" autocomplete="email">
                     </div>
-                    <div class="input required">
-                        <label for="signupNationalId">کد ملی</label>
-                        <input id="signupNationalId" type="text" placeholder="کد ملی (10 رقم)" maxlength="10" pattern="[0-9]{10}" autocomplete="off">
-                    </div>
+                    
+                    <!-- فیلد شماره تلفن با پیش‌شماره -->
                     <div class="input required">
                         <label for="signupPhone">شماره تماس</label>
-                        <input id="signupPhone" type="tel" placeholder="شماره تماس (09xxxxxxxxx)" pattern="09[0-9]{9}" autocomplete="tel">
+                        <div class="phone-input-group">
+                            <select id="signupPhonePrefix" class="phone-prefix-select">
+                                <option value="+98">+98 (ایران)</option>
+                                <option value="+90">+90 (ترکیه)</option>
+                                <option value="+966">+966 (عربستان)</option>
+                                <option value="+964">+964 (عراق)</option>
+                                <option value="+971">+971 (امارات)</option>
+                                <option value="+974">+974 (قطر)</option>
+                                <option value="+965">+965 (کویت)</option>
+                                <option value="+968">+968 (عمان)</option>
+                                <option value="+961">+961 (لبنان)</option>
+                                <option value="+962">+962 (اردن)</option>
+                                <option value="+20">+20 (مصر)</option>
+                                <option value="+963">+963 (سوریه)</option>
+                            </select>
+                            <div class="phone-number-input">
+                                <input id="signupPhone" type="tel" placeholder="شماره تماس" autocomplete="tel">
+                            </div>
+                        </div>
+                        <small class="muted" style="display: block; margin-top: 5px;">مثال: برای ایران: 9123456789</small>
                     </div>
                     
                     <div class="input required">
@@ -3344,7 +3639,7 @@
                         </div>
                     </div>
                     <label class="checkbox">
-                        <input id="agree" type="checkbox"> با <a href="#" style="color: var(--accent-1); text-decoration: none;">قوانین و محرمانگی</a> موافقم
+                        <input id="agree" type="checkbox"> با <a href="javascript:void(0)" onclick="showTermsModal()" style="color: var(--accent-1); text-decoration: none;">قوانین و محرمانگی</a> موافقم
                     </label>
                     <div class="button-group">
                         <button class="glass-button primary" id="signupSubmitBtn" type="button">
@@ -3378,11 +3673,11 @@
                             <label>شماره تلفن شما</label>
                             <p id="displayPhoneNumber" class="muted"></p>
                             <div class="otp-container">
-                                <input type="text" class="otp-input" maxlength="1" data-index="0" autocomplete="off">
-                                <input type="text" class="otp-input" maxlength="1" data-index="1" autocomplete="off">
-                                <input type="text" class="otp-input" maxlength="1" data-index="2" autocomplete="off">
-                                <input type="text" class="otp-input" maxlength="1" data-index="3" autocomplete="off">
-                                <input type="text" class="otp-input" maxlength="1" data-index="4" autocomplete="off">
+                                <input type="text" class="otp-input" maxlength="1" data-index="4" autocomplete="off" dir="ltr">
+                                <input type="text" class="otp-input" maxlength="1" data-index="3" autocomplete="off" dir="ltr">
+                                <input type="text" class="otp-input" maxlength="1" data-index="2" autocomplete="off" dir="ltr">
+                                <input type="text" class="otp-input" maxlength="1" data-index="1" autocomplete="off" dir="ltr">
+                                <input type="text" class="otp-input" maxlength="1" data-index="0" autocomplete="off" dir="ltr">
                             </div>
                             <div class="timer" id="otpTimer">02:00</div>
                             <div class="resend-otp">
@@ -3775,7 +4070,8 @@
         let token = localStorage.getItem('token') || null;
         let currentUserId = localStorage.getItem('userId') || null;
         let currentUserData = JSON.parse(localStorage.getItem('userData') || '{}');
-        
+        let pendingAction = null; // برای ذخیره عملیات معلق
+
         // تابع برای ایجاد هدرهای احراز هویت
         function getAuthHeaders() {
             const headers = {
@@ -3788,6 +4084,85 @@
             }
             
             return headers;
+        }
+
+        // تابع‌های جدید برای مودال کد ملی
+        function showNationalIdModal(actionCallback) {
+            pendingAction = actionCallback;
+            document.getElementById('nationalIdModal').style.display = 'flex';
+            document.getElementById('nationalIdInput').focus();
+        }
+
+        function hideNationalIdModal() {
+            document.getElementById('nationalIdModal').style.display = 'none';
+            document.getElementById('nationalIdInput').value = '';
+            pendingAction = null;
+        }
+
+        async function submitNationalId() {
+            const nationalId = document.getElementById('nationalIdInput').value.trim();
+            
+            if (!nationalId || nationalId.length !== 10 || !/^\d+$/.test(nationalId)) {
+                showModal('خطا', 'لطفاً یک کد ملی معتبر 10 رقمی وارد کنید.', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/users/add-national-id`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ national_id: nationalId })
+                });
+                
+                if (response.ok) {
+                    showModal('موفقیت', 'کد ملی با موفقیت ثبت شد.', 'success');
+                    hideNationalIdModal();
+                    
+                    // به‌روزرسانی اطلاعات کاربر
+                    currentUserData.national_id = nationalId;
+                    localStorage.setItem('userData', JSON.stringify(currentUserData));
+                    
+                    // اجرای عملیات معلق
+                    if (pendingAction) {
+                        pendingAction();
+                    }
+                } else {
+                    const error = await response.json();
+                    showModal('خطا', error.detail || 'خطا در ثبت کد ملی', 'error');
+                }
+            } catch (error) {
+                console.error('خطا در ثبت کد ملی:', error);
+                showModal('خطا', 'خطا در ارتباط با سرور', 'error');
+            }
+        }
+
+        // تابع‌های جدید برای مودال قوانین
+        function showTermsModal() {
+            document.getElementById('termsModal').style.display = 'flex';
+            document.getElementById('termsContent').style.display = 'block';
+            document.getElementById('privacyContent').style.display = 'none';
+            
+            // تنظیم تب فعال
+            document.querySelectorAll('.terms-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelector('.terms-tab[data-tab="terms"]').classList.add('active');
+        }
+
+        function hideTermsModal() {
+            document.getElementById('termsModal').style.display = 'none';
+        }
+
+        function acceptTerms() {
+            const agreeCheckbox = document.getElementById('agreeTerms');
+            if (!agreeCheckbox.checked) {
+                showModal('خطا', 'لطفاً با قوانین و مقررات موافقت کنید.', 'error');
+                return;
+            }
+            
+            document.getElementById('agree').checked = true;
+            hideTermsModal();
+            showModal('موفقیت', 'با تشکر از موافقت شما با قوانین و مقررات.', 'success');
         }
 
         // مدیریت کارت پروفایل
@@ -4272,7 +4647,7 @@
             }
         };
 
-        // مدیریت OTP - سیستم جدید و اصلاح شده
+        // مدیریت OTP - اصلاح شده برای ورود از راست به چپ
         const OTPManager = {
             timer: null,
             timeLeft: 120,
@@ -4280,6 +4655,7 @@
             currentPhone: '',
             currentUserData: null,
             isPhoneVerified: false,
+            currentAction: null, // 'signup' یا 'login'
             
             initialize() {
                 console.log("📱 راه‌اندازی مدیریت OTP");
@@ -4301,17 +4677,36 @@
                     resendOtpBtn.addEventListener('click', this.resendOTP.bind(this));
                 }
                 
-                // مدیریت ورودی OTP
+                // مدیریت ورودی OTP برای ورود از راست به چپ
                 otpInputs.forEach((input, index) => {
+                    // تنظیم جهت برای نمایش اعداد فارسی
+                    input.dir = 'ltr';
+                    input.style.textAlign = 'center';
+                    
                     input.addEventListener('input', (e) => {
-                        if (e.target.value.length === 1 && index < otpInputs.length - 1) {
-                            otpInputs[index + 1].focus();
+                        const value = e.target.value;
+                        
+                        // فقط اعداد مجاز هستند
+                        if (!/^\d?$/.test(value)) {
+                            e.target.value = '';
+                            return;
                         }
+                        
+                        // اگر عدد وارد شد و جعبه قبلی وجود دارد، به آن برو
+                        if (value && index > 0) {
+                            otpInputs[index - 1].focus();
+                        }
+                        
+                        // اگر آخرین جعبه پر شد، دکمه تأیید را فعال کن
+                        this.checkOTPComplete();
                     });
                     
                     input.addEventListener('keydown', (e) => {
-                        if (e.key === 'Backspace' && !e.target.value && index > 0) {
-                            otpInputs[index - 1].focus();
+                        if (e.key === 'Backspace' && !e.target.value && index < otpInputs.length - 1) {
+                            // اگر جعبه خالی است و backspace زده شد، به جعبه بعدی برو
+                            setTimeout(() => {
+                                otpInputs[index + 1].focus();
+                            }, 10);
                         }
                     });
                 });
@@ -4319,29 +4714,21 @@
                 console.log("✅ مدیریت OTP راه‌اندازی شد");
             },
             
-            async checkPhoneDuplicate(phone) {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/check-phone/${phone}`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        return data.exists || false;
-                    }
-                    return false;
-                } catch (error) {
-                    console.error('خطا در بررسی شماره تلفن:', error);
-                    return false;
-                }
-            },
-            
             async handleSignup() {
                 console.log("📝 ثبت‌نام مرحله اول - ارسال OTP");
                 
+                // بررسی موافقت با قوانین
+                if (!document.getElementById('agree').checked) {
+                    showModal('خطا', 'لطفاً با قوانین و مقررات موافقت کنید.', 'error');
+                    return;
+                }
+                
                 // جمع‌آوری اطلاعات از فرم
-                const firstName = document.getElementById('signupFirstName').value;
-                const lastName = document.getElementById('signupLastName').value;
-                const email = document.getElementById('signupEmail').value;
-                const nationalId = document.getElementById('signupNationalId').value;
-                const phone = document.getElementById('signupPhone').value;
+                const firstName = document.getElementById('signupFirstName').value.trim();
+                const lastName = document.getElementById('signupLastName').value.trim();
+                const email = document.getElementById('signupEmail').value.trim();
+                const phonePrefix = document.getElementById('signupPhonePrefix').value;
+                const phone = document.getElementById('signupPhone').value.trim();
                 const country = document.getElementById('signupCountry').value;
                 const province = document.getElementById('signupProvince').value;
                 const city = document.getElementById('signupCity').value;
@@ -4350,7 +4737,7 @@
                 const password2 = document.getElementById('signupPassword2').value;
                 
                 // اعتبارسنجی فرم
-                if (!firstName || !lastName || !email || !nationalId || !phone || !country || !province || !city || !gender || !password || !password2) {
+                if (!firstName || !lastName || !email || !phone || !country || !province || !city || !gender || !password || !password2) {
                     showModal('خطا', 'لطفاً تمام فیلدهای فرم را پر کنید.', 'error');
                     return;
                 }
@@ -4360,20 +4747,9 @@
                     return;
                 }
                 
-                if (!document.getElementById('agree').checked) {
-                    showModal('خطا', 'لطفاً با قوانین و مقررات موافقت کنید.', 'error');
-                    return;
-                }
-                
                 // بررسی اعتبار شماره تلفن
-                if (!phone.startsWith('09') || phone.length !== 11) {
-                    showModal('خطا', 'شماره تلفن باید 11 رقم و با 09 شروع شود.', 'error');
-                    return;
-                }
-                
-                // بررسی اعتبار کد ملی
-                if (nationalId.length !== 10 || !/^\d+$/.test(nationalId)) {
-                    showModal('خطا', 'کد ملی باید 10 رقم باشد.', 'error');
+                if (!phone.match(/^\d+$/)) {
+                    showModal('خطا', 'شماره تلفن باید فقط شامل اعداد باشد.', 'error');
                     return;
                 }
                 
@@ -4389,24 +4765,26 @@
                     first_name: firstName,
                     last_name: lastName,
                     email: email,
-                    national_id: nationalId,
                     phone_number: phone,
                     country: country,
                     province: province,
                     city: city,
                     gender: gender,
-                    password: password
+                    password: password,
+                    has_accepted_terms: true,
+                    phone_prefix: phonePrefix
                 };
                 
                 this.currentPhone = phone;
                 this.currentEmail = email;
+                this.currentAction = 'signup';
                 
                 // ارسال OTP
                 await this.sendOTP();
             },
             
             async sendOTP() {
-                console.log("📤 ارسال کد OTP برای ثبت‌نام");
+                console.log("📤 ارسال کد OTP");
                 
                 if (!this.currentPhone || !this.currentEmail || !this.currentUserData) {
                     showModal('خطا', 'لطفاً تمام اطلاعات را به درستی وارد کنید.', 'error');
@@ -4442,6 +4820,11 @@
                         document.getElementById('step1').classList.remove('active');
                         document.getElementById('step2').classList.add('active');
                         
+                        // پاک کردن ورودی‌های OTP
+                        document.querySelectorAll('.otp-input').forEach(input => {
+                            input.value = '';
+                        });
+                        
                         // شروع تایمر
                         this.startTimer();
                         
@@ -4462,9 +4845,9 @@
                 const otpInputs = document.querySelectorAll('.otp-input');
                 let otpCode = '';
                 
-                otpInputs.forEach(input => {
-                    otpCode += input.value;
-                });
+                // جمع‌آوری کد از راست به چپ
+                const otpArray = Array.from(otpInputs).map(input => input.value);
+                otpCode = otpArray.reverse().join('');
                 
                 if (otpCode.length !== 5) {
                     showModal('خطا', 'لطفاً کد ۵ رقمی را کامل وارد کنید.', 'error');
@@ -4535,6 +4918,12 @@
                 }
             },
             
+            checkOTPComplete() {
+                const otpInputs = document.querySelectorAll('.otp-input');
+                const complete = Array.from(otpInputs).every(input => input.value.length === 1);
+                document.getElementById('verifyOtpBtn').disabled = !complete;
+            },
+            
             resendOTP() {
                 console.log("🔄 ارسال مجدد کد OTP");
                 this.sendOTP();
@@ -4543,6 +4932,7 @@
             startTimer() {
                 this.timeLeft = 120;
                 this.updateTimerDisplay();
+                document.getElementById('resendOtpBtn').disabled = true;
                 
                 this.timer = setInterval(() => {
                     this.timeLeft--;
@@ -4567,11 +4957,6 @@
                 const seconds = this.timeLeft % 60;
                 document.getElementById('otpTimer').textContent = 
                     `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                
-                // فعال کردن دکمه ارسال مجدد وقتی تایمر تمام شد
-                if (this.timeLeft <= 0) {
-                    document.getElementById('resendOtpBtn').disabled = false;
-                }
             }
         };
 
@@ -5107,10 +5492,21 @@
                     return;
                 }
                 
+                // بررسی کد ملی کاربر
+                if (!currentUserData.national_id) {
+                    showNationalIdModal(() => {
+                        this.registerForEvent(eventId);
+                    });
+                    return;
+                }
+                
                 try {
-                    const response = await fetch(`${API_BASE_URL}/events/${eventId}/register`, {
+                    const response = await fetch(`${API_BASE_URL}/events/${eventId}/register-with-national-id`, {
                         method: 'POST',
-                        headers: getAuthHeaders()
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify({
+                            national_id: currentUserData.national_id
+                        })
                     });
                     
                     if (response.ok) {
@@ -5412,7 +5808,7 @@
 
         // تابع ورود
         async function login() {
-            const username = document.getElementById('loginUsername').value;
+            const username = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value;
          
             if (!username || !password) {
@@ -5458,11 +5854,6 @@
                             
                             // بارگذاری نوتیفیکیشن‌ها
                             NotificationManager.loadNotifications();
-                            
-                            // بارگذاری رویدادهای من
-                            if (typeof MyEventsManager !== 'undefined' && MyEventsManager.loadMyEvents) {
-                                MyEventsManager.loadMyEvents();
-                            }
                         }, 2000);
                     }
                     
@@ -5502,6 +5893,106 @@
                     'ازمیر': ['ازمیر'],
                     'بورسا': ['بورسا'],
                     'آنتالیا': ['آنتالیا']
+                }
+            },
+            'saudi-arabia': {
+                name: 'عربستان سعودی',
+                provinces: {
+                    'ریاض': ['ریاض'],
+                    'جده': ['جده'],
+                    'مکه': ['مکه'],
+                    'مدینه': ['مدینه'],
+                    'دمام': ['دمام']
+                }
+            },
+            'iraq': {
+                name: 'عراق',
+                provinces: {
+                    'بغداد': ['بغداد'],
+                    'بصره': ['بصره'],
+                    'موصل': ['موصل'],
+                    'کربلا': ['کربلا'],
+                    'نجف': ['نجف']
+                }
+            },
+            'uae': {
+                name: 'امارات',
+                provinces: {
+                    'دبی': ['دبی'],
+                    'ابوظبی': ['ابوظبی'],
+                    'شارجه': ['شارجه'],
+                    'عجمان': ['عجمان'],
+                    'راس الخیمه': ['راس الخیمه']
+                }
+            },
+            'qatar': {
+                name: 'قطر',
+                provinces: {
+                    'دوحه': ['دوحه'],
+                    'الریان': ['الریان'],
+                    'ام صلال': ['ام صلال'],
+                    'الخور': ['الخور'],
+                    'الوعی': ['الوعی']
+                }
+            },
+            'kuwait': {
+                name: 'کویت',
+                provinces: {
+                    'کویت': ['کویت'],
+                    'حولی': ['حولی'],
+                    'فرمانیه': ['فرمانیه'],
+                    'احمدی': ['احمدی'],
+                    'جهرا': ['جهرا']
+                }
+            },
+            'oman': {
+                name: 'عمان',
+                provinces: {
+                    'مسقط': ['مسقط'],
+                    'صلاله': ['صلاله'],
+                    'صحار': ['صحار'],
+                    'صور': ['صور'],
+                    'نزوی': ['نزوی']
+                }
+            },
+            'lebanon': {
+                name: 'لبنان',
+                provinces: {
+                    'بیروت': ['بیروت'],
+                    'طرابلس': ['طرابلس'],
+                    'صور': ['صور'],
+                    'صیدا': ['صیدا'],
+                    'زحله': ['زحله']
+                }
+            },
+            'jordan': {
+                name: 'اردن',
+                provinces: {
+                    'عمان': ['عمان'],
+                    'زرقاء': ['زرقاء'],
+                    'اربد': ['اربد'],
+                    'مادبا': ['مادبا'],
+                    'عقبه': ['عقبه']
+                }
+            },
+            'egypt': {
+                name: 'مصر',
+                provinces: {
+                    'قاهره': ['قاهره'],
+                    'اسکندریه': ['اسکندریه'],
+                    'جیزه': ['جیزه'],
+                    'شرم الشیخ': ['شرم الشیخ'],
+                    'پورت سعید': ['پورت سعید']
+                }
+            },
+            'syria': {
+                name: 'سوریه',
+                provinces: {
+                    'دمشق': ['دمشق'],
+                    'حلب': ['حلب'],
+                    'حمص': ['حمص'],
+                    'لاذقیه': ['لاذقیه'],
+                    'حماة': ['حماة']
                 }
             }
         };
@@ -5548,6 +6039,23 @@
                 btn.addEventListener('click', function(e) {
                     e.preventDefault();
                     showModal('تقویم', 'این بخش به زودی راه‌اندازی خواهد شد.', 'info');
+                });
+            });
+            
+            // event listener برای تب‌های قوانین
+            document.querySelectorAll('.terms-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabName = this.getAttribute('data-tab');
+                    
+                    // تنظیم تب فعال
+                    document.querySelectorAll('.terms-tab').forEach(t => {
+                        t.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    
+                    // نمایش محتوای مرتبط
+                    document.getElementById('termsContent').style.display = tabName === 'terms' ? 'block' : 'none';
+                    document.getElementById('privacyContent').style.display = tabName === 'privacy' ? 'block' : 'none';
                 });
             });
             
@@ -5660,6 +6168,32 @@
                         option.textContent = city;
                         citySelect.appendChild(option);
                     });
+                }
+            });
+            
+            // تنظیم پیش‌شماره تلفن بر اساس کشور انتخاب شده
+            document.getElementById('signupCountry').addEventListener('change', function() {
+                const country = this.value;
+                const phonePrefixSelect = document.getElementById('signupPhonePrefix');
+                
+                // تنظیم پیش‌شماره پیش‌فرض بر اساس کشور
+                const prefixMap = {
+                    'iran': '+98',
+                    'turkey': '+90',
+                    'saudi-arabia': '+966',
+                    'iraq': '+964',
+                    'uae': '+971',
+                    'qatar': '+974',
+                    'kuwait': '+965',
+                    'oman': '+968',
+                    'lebanon': '+961',
+                    'jordan': '+962',
+                    'egypt': '+20',
+                    'syria': '+963'
+                };
+                
+                if (prefixMap[country]) {
+                    phonePrefixSelect.value = prefixMap[country];
                 }
             });
             
