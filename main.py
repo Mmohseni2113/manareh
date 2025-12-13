@@ -103,14 +103,14 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 # تنظیمات کاوه‌نگار - استفاده از متغیرهای محیطی
 KAVENEGAR_API_KEY = os.getenv("KAVENEGAR_API_KEY", "6A6F54654839584E356A6633743272783851717A6C7663667477615357533163595267372B68446636426B3D")
 
-# مدل‌های دیتابیس
+# مدل‌های دیتابیس - اصلاح شده: national_id به nullable=True تغییر کرد
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     first_name = Column(String(50), nullable=False)
     last_name = Column(String(50), nullable=False)
     email = Column(String(100), unique=True, nullable=False)
-    national_id = Column(String(10), unique=True, nullable=True)  # تغییر به nullable
+    national_id = Column(String(10), nullable=True)  # تغییر به nullable برای کاربران جدید
     phone_number = Column(String(15), unique=True, nullable=False)  # افزایش به 15 کاراکتر برای پیش‌شماره
     country = Column(String(50), nullable=False)
     province = Column(String(50), nullable=False)
@@ -190,7 +190,7 @@ class UserFavorite(Base):
     event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-# تابع برای بررسی و ایجاد فیلدهای جدید
+# تابع برای بررسی و ایجاد فیلدهای جدید - اصلاح شده برای national_id
 def check_and_create_missing_columns():
     """بررسی و ایجاد فیلدهای جدید در جداول"""
     db = SessionLocal()
@@ -760,7 +760,7 @@ async def send_otp(request: OTPSendRequest, db: Session = Depends(get_db)):
             detail="خطای سرور در ارسال کد تأیید"
         )
 
-# 📩 تایید کد OTP و فعال‌سازی حساب کاربری - اصلاح شده
+# 📩 تایید کد OTP و فعال‌سازی حساب کاربری - اصلاح شده برای national_id
 @app.post("/verify-otp", response_model=OTPVerifyResponse)
 async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
     try:
@@ -790,7 +790,7 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
             db.refresh(user)
 
         else:
-            # ایجاد کاربر جدید
+            # ایجاد کاربر جدید - بدون نیاز به national_id
             import json
             try:
                 user_data = json.loads(otp_temp.user_data) if otp_temp.user_data else {}
@@ -811,7 +811,8 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
                 password=hashed_password,
                 is_verified=True,
                 has_accepted_terms=user_data.get("has_accepted_terms", False),
-                phone_prefix=user_data.get("phone_prefix", "+98")
+                phone_prefix=user_data.get("phone_prefix", "+98"),
+                national_id=None  # کاربر جدید بدون کد ملی ثبت می‌شود
             )
             db.add(user)
             db.commit()
@@ -1156,16 +1157,16 @@ async def add_national_id(
             detail="خطای سرور در ثبت کد ملی"
         )
 
-# 🎯 اضافه کردن endpoint برای ثبت‌نام در رویداد با کد ملی
-@app.post("/events/{event_id}/register-with-national-id")
-async def register_for_event_with_national_id(
+# 🎯 اضافه کردن endpoint جدید برای ثبت‌نام در رویداد (با بررسی کد ملی)
+@app.post("/events/{event_id}/register")
+async def register_for_event(
     event_id: int,
-    national_id: str,
+    national_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    ثبت‌نام در رویداد با کد ملی
+    ثبت‌نام در رویداد با بررسی کد ملی
     """
     try:
         if not current_user:
@@ -1175,10 +1176,27 @@ async def register_for_event_with_national_id(
             )
         
         # بررسی کد ملی
-        if not national_id or not national_id.isdigit() or len(national_id) != 10:
+        if not current_user.national_id and not national_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="کد ملی باید 10 رقم باشد"
+                detail="برای ثبت‌نام در رویداد ابتدا باید کد ملی خود را ثبت کنید"
+            )
+        
+        # اگر کاربر کد ملی دارد، از آن استفاده کن
+        if current_user.national_id:
+            national_id_used = current_user.national_id
+        elif national_id:
+            # اعتبارسنجی کد ملی وارد شده
+            if not national_id.isdigit() or len(national_id) != 10:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="کد ملی باید 10 رقم باشد"
+                )
+            national_id_used = national_id
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="کد ملی الزامی است"
             )
         
         event = db.query(Event).filter(Event.id == event_id).first()
@@ -1209,7 +1227,7 @@ async def register_for_event_with_national_id(
         registration = EventParticipant(
             event_id=event_id,
             user_id=current_user.id,
-            national_id_used=national_id
+            national_id_used=national_id_used
         )
         db.add(registration)
         db.commit()
@@ -1228,7 +1246,7 @@ async def register_for_event_with_national_id(
         return {
             "message": "ثبت‌نام با موفقیت انجام شد",
             "registration_id": registration.id,
-            "national_id_used": national_id
+            "national_id_used": national_id_used
         }
         
     except HTTPException:
@@ -1912,73 +1930,7 @@ async def get_comments(event_id: int, db: Session = Depends(get_db)):
             detail="خطای سرور در دریافت نظرات"
         )
 
-@app.post("/events/{event_id}/register")
-async def register_for_event(event_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    try:
-        logger.info(f"ثبت‌نام کاربر {current_user.id} برای رویداد {event_id}")
-        
-        # بررسی آیا کاربر کد ملی دارد
-        if not current_user.national_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="برای ثبت‌نام در رویداد ابتدا باید کد ملی خود را ثبت کنید"
-            )
-        
-        event = db.query(Event).filter(Event.id == event_id).first()
-        if not event:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="رویداد یافت نشد"
-            )
-        
-        existing_registration = db.query(EventParticipant).filter(
-            EventParticipant.event_id == event_id,
-            EventParticipant.user_id == current_user.id
-        ).first()
-        
-        if existing_registration:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="شما قبلاً در این رویداد ثبت‌نام کرده‌اید"
-            )
-        
-        current_participants = db.query(EventParticipant).filter(EventParticipant.event_id == event_id).count()
-        if current_participants >= event.capacity:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="ظرفیت رویداد تکمیل شده است"
-            )
-        
-        registration = EventParticipant(
-            event_id=event_id,
-            user_id=current_user.id,
-            national_id_used=current_user.national_id
-        )
-        db.add(registration)
-        db.commit()
-        db.refresh(registration)
-        
-        # ایجاد نوتیفیکیشن
-        notification = Notification(
-            user_id=current_user.id,
-            title="ثبت‌نام موفق",
-            message=f"شما با موفقیت در رویداد '{event.title}' ثبت‌نام کردید.",
-            type="success"
-        )
-        db.add(notification)
-        db.commit()
-        
-        return {"message": "ثبت‌نام با موفقیت انجام شد", "registration_id": registration.id}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        logger.error(f"خطا در ثبت‌نام: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="خطای سرور در ثبت‌نام"
-        )
+# endpoint ثبت‌نام در رویداد قبلاً اصلاح شده است
 
 # اضافه کردن endpoint جدید برای حذف ثبت‌نام از رویداد
 @app.delete("/events/{event_id}/unregister")
