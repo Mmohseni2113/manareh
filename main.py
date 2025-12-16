@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, text, inspect, Boolean, func
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from sqlalchemy.exc import IntegrityError
 
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
@@ -103,33 +104,33 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 # تنظیمات کاوه‌نگار - استفاده از متغیرهای محیطی
 KAVENEGAR_API_KEY = os.getenv("KAVENEGAR_API_KEY", "6A6F54654839584E356A6633743272783851717A6C7663667477615357533163595267372B68446636426B3D")
 
-# مدل‌های دیتابیس - اصلاح شده: national_id به nullable=True تغییر کرد
+# مدل‌های دیتابیس - اصلاح شده برای nullable بودن national_id
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    first_name = Column(String(50), nullable=False)
-    last_name = Column(String(50), nullable=False)
-    email = Column(String(100), unique=True, nullable=False)
-    national_id = Column(String(10), nullable=True)  # تغییر به nullable برای کاربران جدید
-    phone_number = Column(String(15), unique=True, nullable=False)  # افزایش به 15 کاراکتر برای پیش‌شماره
+    first_name = Column(String(100), nullable=False)
+    last_name = Column(String(100), nullable=False)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    phone_number = Column(String(15), unique=True, nullable=False, index=True)
+    phone_prefix = Column(String(5), default="+98")
+    password = Column(String(255), nullable=False)
+    national_id = Column(String(10), nullable=True, unique=True)  # تغییر به nullable=True و unique
     country = Column(String(50), nullable=False)
     province = Column(String(50), nullable=False)
     city = Column(String(50), nullable=False)
     gender = Column(String(10), nullable=False)
-    password = Column(String(255), nullable=False)
+    is_verified = Column(Boolean, default=False)
+    has_accepted_terms = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     verification_code = Column(String(10), nullable=True)
     code_expire_time = Column(DateTime, nullable=True)
-    is_verified = Column(Boolean, default=False)
-    has_accepted_terms = Column(Boolean, default=False)  # اضافه شده
-    phone_prefix = Column(String(5), default="+98")  # اضافه شده
 
 # جدول جدید برای ذخیره موقت OTP
 class OTPTemp(Base):
     __tablename__ = "otp_temp"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    email = Column(String(100), nullable=False, index=True)
-    phone_number = Column(String(15), nullable=False)  # افزایش به 15 کاراکتر
+    email = Column(String(255), nullable=False, index=True)
+    phone_number = Column(String(15), nullable=False)
     verification_code = Column(String(10), nullable=False)
     code_expire_time = Column(DateTime, nullable=False)
     user_data = Column(String(2000), nullable=True)  # ذخیره داده‌های کاربر به صورت JSON
@@ -171,7 +172,7 @@ class EventParticipant(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     registered_at = Column(DateTime, default=datetime.utcnow)
     attended = Column(Boolean, default=False)
-    national_id_used = Column(String(10), nullable=True)  # اضافه شده برای ذخیره کد ملی استفاده شده
+    national_id_used = Column(String(10), nullable=True)
 
 class Notification(Base):
     __tablename__ = "notifications"
@@ -190,7 +191,7 @@ class UserFavorite(Base):
     event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-# تابع برای بررسی و ایجاد فیلدهای جدید - اصلاح شده برای national_id
+# تابع برای بررسی و ایجاد فیلدهای جدید - اصلاح شده
 def check_and_create_missing_columns():
     """بررسی و ایجاد فیلدهای جدید در جداول"""
     db = SessionLocal()
@@ -199,9 +200,31 @@ def check_and_create_missing_columns():
         
         # بررسی فیلدهای users
         users_columns = [col['name'] for col in inspector.get_columns('users')]
-        missing_columns = []
         
+        # بررسی و اصلاح فیلد national_id
+        if 'national_id' in users_columns:
+            # بررسی اینکه آیا فیلد nullable است
+            try:
+                db.execute(text("ALTER TABLE users MODIFY national_id VARCHAR(10) NULL"))
+                logger.info("فیلد national_id به nullable تغییر یافت")
+            except Exception as e:
+                logger.info(f"فیلد national_id قبلاً nullable است: {e}")
+        else:
+            # اگر فیلد وجود ندارد، آن را ایجاد کن
+            db.execute(text("ALTER TABLE users ADD COLUMN national_id VARCHAR(10) NULL"))
+            logger.info("فیلد national_id ایجاد شد")
+        
+        # ایجاد ایندکس unique برای national_id
+        try:
+            db.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_users_national_id ON users(national_id)"))
+            logger.info("ایندکس unique برای national_id ایجاد شد")
+        except Exception as e:
+            logger.info(f"ایندکس unique برای national_id قبلاً وجود دارد: {e}")
+        
+        # بررسی فیلدهای دیگر
+        missing_columns = []
         expected_columns = ['verification_code', 'code_expire_time', 'is_verified', 'has_accepted_terms', 'phone_prefix']
+        
         for col in expected_columns:
             if col not in users_columns:
                 missing_columns.append(col)
@@ -224,84 +247,59 @@ def check_and_create_missing_columns():
             db.commit()
             logger.info("فیلدهای جدید در users ایجاد شدند")
         
-        # بررسی فیلدهای event_participants
-        event_participants_columns = [col['name'] for col in inspector.get_columns('event_participants')]
-        if 'national_id_used' not in event_participants_columns:
-            logger.info("ایجاد فیلد national_id_used در event_participants")
-            db.execute(text("ALTER TABLE event_participants ADD COLUMN national_id_used VARCHAR(10)"))
-            db.commit()
-            logger.info("فیلد national_id_used ایجاد شد")
+        # بررسی سایر جداول
+        tables_to_check = ['event_participants', 'events', 'comments', 'notifications', 'user_favorites', 'otp_temp']
         
-        # بررسی فیلدهای events
-        events_columns = [col['name'] for col in inspector.get_columns('events')]
-        missing_columns = []
+        for table_name in tables_to_check:
+            if table_name not in inspector.get_table_names():
+                logger.info(f"ایجاد جدول {table_name}")
+                Base.metadata.tables[table_name].create(bind=engine)
+                logger.info(f"جدول {table_name} ایجاد شد")
         
-        expected_columns = ['type', 'city', 'province', 'country', 'capacity', 'active', 'is_free', 'price']
-        for col in expected_columns:
-            if col not in events_columns:
-                missing_columns.append(col)
-        
-        if missing_columns:
-            logger.info(f"ایجاد فیلدهای جدید در events: {missing_columns}")
+        # بررسی فیلدهای خاص در جداول
+        try:
+            # بررسی فیلدهای events
+            events_columns = [col['name'] for col in inspector.get_columns('events')]
+            events_missing = []
             
-            for col in missing_columns:
-                if col == 'type':
-                    db.execute(text("ALTER TABLE events ADD COLUMN type VARCHAR(20) DEFAULT 'religious'"))
-                elif col == 'city':
-                    db.execute(text("ALTER TABLE events ADD COLUMN city VARCHAR(50) DEFAULT 'تهران'"))
-                elif col == 'province':
-                    db.execute(text("ALTER TABLE events ADD COLUMN province VARCHAR(50) DEFAULT 'تهران'"))
-                elif col == 'country':
-                    db.execute(text("ALTER TABLE events ADD COLUMN country VARCHAR(50) DEFAULT 'iran'"))
-                elif col == 'capacity':
-                    db.execute(text("ALTER TABLE events ADD COLUMN capacity INT DEFAULT 100"))
-                elif col == 'active':
-                    db.execute(text("ALTER TABLE events ADD COLUMN active TINYINT DEFAULT 1"))
-                elif col == 'is_free':
-                    db.execute(text("ALTER TABLE events ADD COLUMN is_free TINYINT DEFAULT 1"))
-                elif col == 'price':
-                    db.execute(text("ALTER TABLE events ADD COLUMN price FLOAT DEFAULT 0.0"))
+            event_expected = ['type', 'city', 'province', 'country', 'capacity', 'active', 'is_free', 'price']
+            for col in event_expected:
+                if col not in events_columns:
+                    events_missing.append(col)
             
-            db.commit()
-            logger.info("فیلدهای جدید در events ایجاد شدند")
-        
-        # بررسی وجود جدول comments
-        if 'comments' not in inspector.get_table_names():
-            logger.info("ایجاد جدول comments")
-            Base.metadata.tables['comments'].create(bind=engine)
-            logger.info("جدول comments ایجاد شد")
-        
-        # بررسی وجود جدول event_participants
-        if 'event_participants' not in inspector.get_table_names():
-            logger.info("ایجاد جدول event_participants")
-            Base.metadata.tables['event_participants'].create(bind=engine)
-            logger.info("جدول event_participants ایجاد شد")
-        
-        # بررسی وجود جدول notifications
-        if 'notifications' not in inspector.get_table_names():
-            logger.info("ایجاد جدول notifications")
-            Base.metadata.tables['notifications'].create(bind=engine)
-            logger.info("جدول notifications ایجاد شد")
-        
-        # بررسی وجود جدول user_favorites
-        if 'user_favorites' not in inspector.get_table_names():
-            logger.info("ایجاد جدول user_favorites")
-            Base.metadata.tables['user_favorites'].create(bind=engine)
-            logger.info("جدول user_favorites ایجاد شد")
-        
-        # بررسی وجود جدول otp_temp
-        if 'otp_temp' not in inspector.get_table_names():
-            logger.info("ایجاد جدول otp_temp")
-            Base.metadata.tables['otp_temp'].create(bind=engine)
-            logger.info("جدول otp_temp ایجاد شد")
-        
-        # بررسی فیلد rating در comments
-        comments_columns = [col['name'] for col in inspector.get_columns('comments')]
-        if 'rating' not in comments_columns:
-            logger.info("ایجاد فیلد rating در comments")
-            db.execute(text("ALTER TABLE comments ADD COLUMN rating INT DEFAULT 5"))
-            db.commit()
-            logger.info("فیلد rating ایجاد شد")
+            if events_missing:
+                logger.info(f"ایجاد فیلدهای جدید در events: {events_missing}")
+                for col in events_missing:
+                    if col == 'type':
+                        db.execute(text("ALTER TABLE events ADD COLUMN type VARCHAR(20) DEFAULT 'religious'"))
+                    elif col == 'city':
+                        db.execute(text("ALTER TABLE events ADD COLUMN city VARCHAR(50) DEFAULT 'تهران'"))
+                    elif col == 'province':
+                        db.execute(text("ALTER TABLE events ADD COLUMN province VARCHAR(50) DEFAULT 'تهران'"))
+                    elif col == 'country':
+                        db.execute(text("ALTER TABLE events ADD COLUMN country VARCHAR(50) DEFAULT 'iran'"))
+                    elif col == 'capacity':
+                        db.execute(text("ALTER TABLE events ADD COLUMN capacity INT DEFAULT 100"))
+                    elif col == 'active':
+                        db.execute(text("ALTER TABLE events ADD COLUMN active TINYINT DEFAULT 1"))
+                    elif col == 'is_free':
+                        db.execute(text("ALTER TABLE events ADD COLUMN is_free TINYINT DEFAULT 1"))
+                    elif col == 'price':
+                        db.execute(text("ALTER TABLE events ADD COLUMN price FLOAT DEFAULT 0.0"))
+                db.commit()
+                logger.info("فیلدهای جدید در events ایجاد شدند")
+                
+            # بررسی فیلد rating در comments
+            comments_columns = [col['name'] for col in inspector.get_columns('comments')]
+            if 'rating' not in comments_columns:
+                logger.info("ایجاد فیلد rating در comments")
+                db.execute(text("ALTER TABLE comments ADD COLUMN rating INT DEFAULT 5"))
+                db.commit()
+                logger.info("فیلد rating ایجاد شد")
+                
+        except Exception as e:
+            logger.error(f"خطا در ایجاد فیلدها: {e}")
+            db.rollback()
             
     except Exception as e:
         logger.error(f"خطا در ایجاد فیلدها: {e}")
@@ -425,7 +423,7 @@ class CommentResponse(BaseModel):
 class EventParticipantCreate(BaseModel):
     event_id: int
     user_id: int
-    national_id: Optional[str] = None  # اضافه شده
+    national_id: Optional[str] = None
 
 class EventParticipantResponse(BaseModel):
     id: int
@@ -434,7 +432,7 @@ class EventParticipantResponse(BaseModel):
     registered_at: datetime
     attended: bool
     user_name: str
-    national_id_used: Optional[str] = None  # اضافه شده
+    national_id_used: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -489,7 +487,7 @@ class FavoriteResponse(BaseModel):
 class OTPSendRequest(BaseModel):
     email: str
     phone_number: str
-    user_data: Optional[Dict[str, Any]] = None  # داده‌های کاربر برای ثبت‌نام جدید
+    user_data: Optional[Dict[str, Any]] = None
 
 class OTPVerifyRequest(BaseModel):
     email: str
@@ -521,7 +519,7 @@ class SignupStep1Response(BaseModel):
     phone_number: str
     requires_verification: bool = True
 
-# مدل جدید برای اضافه کردن کد ملی
+# مدل جدید برای اضافه کردن کد ملی - اضافه شده
 class AddNationalIdRequest(BaseModel):
     national_id: str
 
@@ -600,7 +598,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# سرویس ارسال پیامک - نسخه واقعی و جایگذاری‌شده
+# سرویس ارسال پیامک
 class KavenegarSMSService:
     def __init__(self):
         self.api_key = KAVENEGAR_API_KEY
@@ -640,7 +638,6 @@ class KavenegarSMSService:
             logger.error(f"خطا در ارتباط با کاوه‌نگار: {e}")
             return False
 
-# این خط رو حتماً داشته باش
 sms_service = KavenegarSMSService()
 
 # بررسی تکراری بودن ایمیل و شماره تلفن
@@ -662,12 +659,50 @@ async def check_duplicate_user(email: str, phone_number: str, db: Session) -> No
             detail="این شماره تلفن قبلاً ثبت شده است"
         )
 
-# 📤 ارسال OTP - کاملاً اصلاح شده
+# تابع اعتبارسنجی کد ملی - بهبود یافته
+def is_valid_national_code(code: str) -> bool:
+    """
+    اعتبارسنجی کد ملی ایرانی
+    """
+    if not code or not isinstance(code, str):
+        return False
+    
+    # حذف فاصله و کاراکترهای غیرعددی
+    code = code.strip()
+    
+    # بررسی طول
+    if len(code) != 10:
+        return False
+    
+    # بررسی اینکه همه کاراکترها عدد هستند
+    if not code.isdigit():
+        return False
+    
+    # بررسی کدهای غیرمجاز (همه ارقام یکسان)
+    if code == code[0] * 10:
+        return False
+    
+    try:
+        # الگوریتم اعتبارسنجی کد ملی
+        sum = 0
+        for i in range(9):
+            sum += int(code[i]) * (10 - i)
+        
+        remainder = sum % 11
+        control_digit = int(code[9])
+        
+        if remainder < 2:
+            return control_digit == remainder
+        else:
+            return control_digit == (11 - remainder)
+    except:
+        return False
+
+# 📤 ارسال OTP
 @app.post("/send-otp")
 async def send_otp(request: OTPSendRequest, db: Session = Depends(get_db)):
     """
     ارسال کد تأیید به شماره تلفن کاربر
-    این endpoint هم برای کاربران موجود و هم برای ثبت‌نام جدید کار می‌کند
     """
     try:
         logger.info(f"درخواست ارسال OTP برای ایمیل: {request.email} و شماره: {request.phone_number}")
@@ -760,7 +795,7 @@ async def send_otp(request: OTPSendRequest, db: Session = Depends(get_db)):
             detail="خطای سرور در ارسال کد تأیید"
         )
 
-# 📩 تایید کد OTP و فعال‌سازی حساب کاربری - اصلاح شده برای national_id
+# 📩 تایید کد OTP و فعال‌سازی حساب کاربری - اصلاح شده برای nullable بودن national_id
 @app.post("/verify-otp", response_model=OTPVerifyResponse)
 async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
     try:
@@ -790,7 +825,7 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
             db.refresh(user)
 
         else:
-            # ایجاد کاربر جدید - بدون نیاز به national_id
+            # ایجاد کاربر جدید بدون کد ملی
             import json
             try:
                 user_data = json.loads(otp_temp.user_data) if otp_temp.user_data else {}
@@ -799,6 +834,7 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
 
             hashed_password = get_password_hash(user_data.get("password", "DefaultPass123"))
 
+            # ایجاد کاربر بدون کد ملی (national_id = None)
             user = User(
                 first_name=user_data.get("first_name", ""),
                 last_name=user_data.get("last_name", ""),
@@ -812,11 +848,17 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
                 is_verified=True,
                 has_accepted_terms=user_data.get("has_accepted_terms", False),
                 phone_prefix=user_data.get("phone_prefix", "+98"),
-                national_id=None  # کاربر جدید بدون کد ملی ثبت می‌شود
+                national_id=None  # صراحتاً None قرار می‌دهیم
             )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
+            
+            try:
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+            except IntegrityError as e:
+                db.rollback()
+                logger.error(f"خطای یکتایی در ایجاد کاربر: {e}")
+                raise HTTPException(500, "خطا در ایجاد حساب کاربری. ممکن است ایمیل یا شماره تلفن تکراری باشد.")
 
         # حذف OTP موقت
         db.delete(otp_temp)
@@ -834,6 +876,9 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
 
     except HTTPException as e:
         raise e
+    except IntegrityError as e:
+        logger.error(f"خطای یکتایی در verify_otp: {str(e)}")
+        raise HTTPException(500, "خطا در ایجاد حساب کاربری. اطلاعات تکراری است.")
     except Exception as e:
         logger.error(f"⚠️ خطا در verify_otp: {str(e)}")
         raise HTTPException(500, f"خطای سرور در تایید کد: {str(e)}")
@@ -979,7 +1024,331 @@ async def signup_step1(user: SignupStep1Request, db: Session = Depends(get_db)):
             detail=f"خطای سرور در ثبت‌نام: {str(e)}"
         )
 
-# 🎯 اضافه کردن endpoint جدید برای دریافت اطلاعات کاربر با ایمیل
+# 🎯 API برای ثبت کد ملی - اضافه شده
+@app.post("/users/add-national-id")
+async def add_national_id(
+    request: AddNationalIdRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    اضافه کردن کد ملی برای کاربر بعد از ثبت‌نام
+    """
+    try:
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="برای ثبت کد ملی باید وارد شوید"
+            )
+        
+        # اگر کاربر قبلاً کد ملی دارد
+        if current_user.national_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="کد ملی قبلاً ثبت شده است"
+            )
+        
+        # اعتبارسنجی کد ملی
+        national_id = request.national_id.strip()
+        
+        # استفاده از تابع اعتبارسنجی واقعی
+        if not is_valid_national_code(national_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="کد ملی معتبر نیست"
+            )
+        
+        # بررسی تکراری بودن کد ملی
+        existing_user = db.query(User).filter(User.national_id == national_id).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="این کد ملی قبلاً ثبت شده است"
+            )
+        
+        # ذخیره کد ملی
+        current_user.national_id = national_id
+        db.commit()
+        
+        logger.info(f"کد ملی برای کاربر {current_user.email} ثبت شد")
+        
+        return {
+            "message": "کد ملی با موفقیت ثبت شد",
+            "national_id": national_id
+        }
+        
+    except HTTPException:
+        raise
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="این کد ملی قبلاً ثبت شده است"
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"خطا در ثبت کد ملی: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="خطای سرور در ثبت کد ملی"
+        )
+
+# 🎯 API برای ثبت‌نام در رویداد با بررسی کد ملی
+@app.post("/events/{event_id}/register")
+async def register_for_event(
+    event_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    ثبت‌نام در رویداد با بررسی کد ملی
+    """
+    try:
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="برای ثبت‌نام در رویداد باید وارد شوید"
+            )
+        
+        # بررسی کد ملی کاربر
+        if not current_user.national_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="برای ثبت‌نام در رویداد، ابتدا کد ملی خود را ثبت کنید"
+            )
+        
+        event = db.query(Event).filter(Event.id == event_id).first()
+        if not event:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="رویداد یافت نشد"
+            )
+        
+        existing_registration = db.query(EventParticipant).filter(
+            EventParticipant.event_id == event_id,
+            EventParticipant.user_id == current_user.id
+        ).first()
+        
+        if existing_registration:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="شما قبلاً در این رویداد ثبت‌نام کرده‌اید"
+            )
+        
+        current_participants = db.query(EventParticipant).filter(EventParticipant.event_id == event_id).count()
+        if current_participants >= event.capacity:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ظرفیت رویداد تکمیل شده است"
+            )
+        
+        registration = EventParticipant(
+            event_id=event_id,
+            user_id=current_user.id,
+            national_id_used=current_user.national_id
+        )
+        db.add(registration)
+        db.commit()
+        db.refresh(registration)
+        
+        # ایجاد نوتیفیکیشن
+        notification = Notification(
+            user_id=current_user.id,
+            title="ثبت‌نام موفق",
+            message=f"شما با موفقیت در رویداد '{event.title}' ثبت‌نام کردید.",
+            type="success"
+        )
+        db.add(notification)
+        db.commit()
+        
+        return {
+            "message": "ثبت‌نام با موفقیت انجام شد",
+            "registration_id": registration.id,
+            "national_id_used": current_user.national_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"خطا در ثبت‌نام: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="خطای سرور در ثبت‌نام"
+        )
+
+# 🎯 API جایگزین برای ثبت‌نام در رویداد با کد ملی
+@app.post("/events/{event_id}/register-with-national-id")
+async def register_for_event_with_national_id(
+    event_id: int,
+    national_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    ثبت‌نام در رویداد با کد ملی
+    """
+    try:
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="برای ثبت‌نام در رویداد باید وارد شوید"
+            )
+        
+        # بررسی کد ملی
+        if not national_id or not national_id.isdigit() or len(national_id) != 10:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="کد ملی باید 10 رقم باشد"
+            )
+        
+        event = db.query(Event).filter(Event.id == event_id).first()
+        if not event:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="رویداد یافت نشد"
+            )
+        
+        existing_registration = db.query(EventParticipant).filter(
+            EventParticipant.event_id == event_id,
+            EventParticipant.user_id == current_user.id
+        ).first()
+        
+        if existing_registration:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="شما قبلاً در این رویداد ثبت‌نام کرده‌اید"
+            )
+        
+        current_participants = db.query(EventParticipant).filter(EventParticipant.event_id == event_id).count()
+        if current_participants >= event.capacity:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ظرفیت رویداد تکمیل شده است"
+            )
+        
+        registration = EventParticipant(
+            event_id=event_id,
+            user_id=current_user.id,
+            national_id_used=national_id
+        )
+        db.add(registration)
+        db.commit()
+        db.refresh(registration)
+        
+        # ایجاد نوتیفیکیشن
+        notification = Notification(
+            user_id=current_user.id,
+            title="ثبت‌نام موفق",
+            message=f"شما با موفقیت در رویداد '{event.title}' ثبت‌نام کردید.",
+            type="success"
+        )
+        db.add(notification)
+        db.commit()
+        
+        return {
+            "message": "ثبت‌نام با موفقیت انجام شد",
+            "registration_id": registration.id,
+            "national_id_used": national_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"خطا در ثبت‌نام: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="خطای سرور در ثبت‌نام"
+        )
+
+# 🎯 API برای ایجاد رویداد با بررسی کد ملی
+@app.post("/events", response_model=EventResponse)
+async def create_event(event: EventCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    ایجاد رویداد جدید با بررسی کد ملی سازنده
+    """
+    try:
+        logger.info(f"دریافت درخواست ایجاد رویداد از کاربر: {current_user.email if current_user else 'Anonymous'}")
+        
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="برای ایجاد رویداد باید وارد شوید"
+            )
+        
+        # بررسی کد ملی کاربر
+        if not current_user.national_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="برای ایجاد رویداد، ابتدا کد ملی خود را ثبت کنید"
+            )
+        
+        if not all([event.title, event.time, event.location]):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="لطفاً همه فیلدها را پر کنید"
+            )
+        
+        user_exists = db.query(User).filter(User.id == event.creator).first()
+        if not user_exists:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="کاربر ایجاد کننده معتبر نیست"
+            )
+        
+        if not event.city:
+            event.city = current_user.city if current_user else "تهران"
+        if not event.province:
+            event.province = current_user.province if current_user else "تهران"
+        
+        # استفاده از تابع موجود برای ایجاد رویدادهای تکراری
+        events_to_create = generate_recurring_events(event, db)
+        created_events = []
+        
+        for event_obj in events_to_create:
+            db.add(event_obj)
+            db.flush()
+            created_events.append(event_obj)
+        
+        db.commit()
+        
+        for event_obj in created_events:
+            db.refresh(event_obj)
+        
+        logger.info(f"{len(created_events)} رویداد با موفقیت ایجاد شد")
+        
+        return EventResponse(
+            id=created_events[0].id,
+            title=created_events[0].title,
+            time=created_events[0].time,
+            location=created_events[0].location,
+            latitude=created_events[0].latitude,
+            longitude=created_events[0].longitude,
+            host=created_events[0].host,
+            creator=created_events[0].creator,
+            created_at=created_events[0].created_at,
+            type=created_events[0].type,
+            city=created_events[0].city,
+            province=created_events[0].province,
+            country=created_events[0].country,
+            capacity=created_events[0].capacity,
+            active=created_events[0].active,
+            is_free=created_events[0].is_free,
+            price=created_events[0].price
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"خطا در ایجاد رویداد: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="خطای سرور در ایجاد رویداد"
+        )
+
+# 🎯 API برای دریافت اطلاعات کاربر با ایمیل
 @app.get("/user-by-email/{email}")
 async def get_user_by_email(email: str, db: Session = Depends(get_db)):
     try:
@@ -1006,7 +1375,7 @@ async def get_user_by_email(email: str, db: Session = Depends(get_db)):
             detail="خطای سرور در دریافت اطلاعات کاربر"
         )
 
-# 🎯 اضافه کردن endpoint برای پرداخت نذورات
+# 🎯 API برای پرداخت نذورات
 @app.post("/donations/make-donation")
 async def make_donation(
     donation_type: str = Query(...),
@@ -1102,164 +1471,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             detail="خطای سرور در ورود"
         )
 
-# 🎯 اضافه کردن endpoint برای ثبت کد ملی
-@app.post("/users/add-national-id")
-async def add_national_id(
-    request: AddNationalIdRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    اضافه کردن کد ملی برای کاربر بعد از ثبت‌نام
-    """
-    try:
-        if not current_user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="برای ثبت کد ملی باید وارد شوید"
-            )
-        
-        # اعتبارسنجی کد ملی
-        national_id = request.national_id.strip()
-        
-        if not national_id.isdigit() or len(national_id) != 10:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="کد ملی باید 10 رقم باشد"
-            )
-        
-        # بررسی تکراری بودن کد ملی
-        existing_user = db.query(User).filter(User.national_id == national_id).first()
-        if existing_user and existing_user.id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="این کد ملی قبلاً ثبت شده است"
-            )
-        
-        # ذخیره کد ملی
-        current_user.national_id = national_id
-        db.commit()
-        
-        logger.info(f"کد ملی برای کاربر {current_user.email} ثبت شد")
-        
-        return {
-            "message": "کد ملی با موفقیت ثبت شد",
-            "national_id": national_id
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        logger.error(f"خطا در ثبت کد ملی: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="خطای سرور در ثبت کد ملی"
-        )
-
-# 🎯 اضافه کردن endpoint جدید برای ثبت‌نام در رویداد (با بررسی کد ملی)
-@app.post("/events/{event_id}/register")
-async def register_for_event(
-    event_id: int,
-    national_id: Optional[str] = None,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    ثبت‌نام در رویداد با بررسی کد ملی
-    """
-    try:
-        if not current_user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="برای ثبت‌نام در رویداد باید وارد شوید"
-            )
-        
-        # بررسی کد ملی
-        if not current_user.national_id and not national_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="برای ثبت‌نام در رویداد ابتدا باید کد ملی خود را ثبت کنید"
-            )
-        
-        # اگر کاربر کد ملی دارد، از آن استفاده کن
-        if current_user.national_id:
-            national_id_used = current_user.national_id
-        elif national_id:
-            # اعتبارسنجی کد ملی وارد شده
-            if not national_id.isdigit() or len(national_id) != 10:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="کد ملی باید 10 رقم باشد"
-                )
-            national_id_used = national_id
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="کد ملی الزامی است"
-            )
-        
-        event = db.query(Event).filter(Event.id == event_id).first()
-        if not event:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="رویداد یافت نشد"
-            )
-        
-        existing_registration = db.query(EventParticipant).filter(
-            EventParticipant.event_id == event_id,
-            EventParticipant.user_id == current_user.id
-        ).first()
-        
-        if existing_registration:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="شما قبلاً در این رویداد ثبت‌نام کرده‌اید"
-            )
-        
-        current_participants = db.query(EventParticipant).filter(EventParticipant.event_id == event_id).count()
-        if current_participants >= event.capacity:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="ظرفیت رویداد تکمیل شده است"
-            )
-        
-        registration = EventParticipant(
-            event_id=event_id,
-            user_id=current_user.id,
-            national_id_used=national_id_used
-        )
-        db.add(registration)
-        db.commit()
-        db.refresh(registration)
-        
-        # ایجاد نوتیفیکیشن
-        notification = Notification(
-            user_id=current_user.id,
-            title="ثبت‌نام موفق",
-            message=f"شما با موفقیت در رویداد '{event.title}' ثبت‌نام کردید.",
-            type="success"
-        )
-        db.add(notification)
-        db.commit()
-        
-        return {
-            "message": "ثبت‌نام با موفقیت انجام شد",
-            "registration_id": registration.id,
-            "national_id_used": national_id_used
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        logger.error(f"خطا در ثبت‌نام: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="خطای سرور در ثبت‌نام"
-        )
-
-# 🎯 اضافه کردن endpoint برای دریافت اطلاعات قوانین
+# 🎯 API برای دریافت قوانین و حریم خصوصی
 @app.get("/terms-and-privacy")
 async def get_terms_and_privacy():
     """
@@ -1298,9 +1510,7 @@ async def get_terms_and_privacy():
         }
     }
 
-# بقیه endpointها همانطور که بودند ادامه می‌یابند...
-# فقط dependencyهایشان به get_db تغییر می‌کند
-
+# تابع ایجاد رویدادهای تکراری
 def generate_recurring_events(base_event: EventCreate, db: Session) -> List[Event]:
     events = []
     
@@ -1411,72 +1621,7 @@ def generate_recurring_events(base_event: EventCreate, db: Session) -> List[Even
     
     return events
 
-@app.post("/events", response_model=EventResponse)
-async def create_event(event: EventCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    try:
-        logger.info(f"دریافت درخواست ایجاد رویداد از کاربر: {current_user.email if current_user else 'Anonymous'}")
-        
-        if not all([event.title, event.time, event.location]):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="لطفاً همه فیلدها را پر کنید"
-            )
-        
-        user_exists = db.query(User).filter(User.id == event.creator).first()
-        if not user_exists:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="کاربر ایجاد کننده معتبر نیست"
-            )
-        
-        if not event.city:
-            event.city = current_user.city if current_user else "تهران"
-        if not event.province:
-            event.province = current_user.province if current_user else "تهران"
-        
-        events_to_create = generate_recurring_events(event, db)
-        created_events = []
-        
-        for event_obj in events_to_create:
-            db.add(event_obj)
-            db.flush()
-            created_events.append(event_obj)
-        
-        db.commit()
-        
-        for event_obj in created_events:
-            db.refresh(event_obj)
-        
-        logger.info(f"{len(created_events)} رویداد با موفقیت ایجاد شد")
-        
-        return EventResponse(
-            id=created_events[0].id,
-            title=created_events[0].title,
-            time=created_events[0].time,
-            location=created_events[0].location,
-            latitude=created_events[0].latitude,
-            longitude=created_events[0].longitude,
-            host=created_events[0].host,
-            creator=created_events[0].creator,
-            created_at=created_events[0].created_at,
-            type=created_events[0].type,
-            city=created_events[0].city,
-            province=created_events[0].province,
-            country=created_events[0].country,
-            capacity=created_events[0].capacity,
-            active=created_events[0].active,
-            is_free=created_events[0].is_free,
-            price=created_events[0].price
-        )
-        
-    except Exception as e:
-        db.rollback()
-        logger.error(f"خطا در ایجاد رویداد: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="خطای سرور در ایجاد رویداد"
-        )
-
+# سایر endpointهای موجود...
 @app.get("/events", response_model=List[EventResponse])
 async def get_events(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
@@ -1929,8 +2074,6 @@ async def get_comments(event_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="خطای سرور در دریافت نظرات"
         )
-
-# endpoint ثبت‌نام در رویداد قبلاً اصلاح شده است
 
 # اضافه کردن endpoint جدید برای حذف ثبت‌نام از رویداد
 @app.delete("/events/{event_id}/unregister")
