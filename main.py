@@ -1,12 +1,14 @@
 from fastapi import HTTPException, FastAPI, Depends, status, Query, BackgroundTasks, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, text, inspect, Boolean, func
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, text, inspect, Boolean, func, Table, Index
+from sqlalchemy.orm import sessionmaker, declarative_base, Session, relationship
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.dialects.mysql import TEXT
 
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
@@ -18,6 +20,9 @@ import base64
 import os
 import random
 import logging
+import json
+import requests
+from contextlib import contextmanager
 
 # فقط این دوتا از کاوه‌نگار
 import requests
@@ -36,6 +41,9 @@ logger = logging.getLogger(__name__)
 
 # ایجاد اپلیکیشن
 app = FastAPI()
+
+# GZip Middleware برای فشرده‌سازی پاسخ‌ها
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # mount استاتیک
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -84,7 +92,10 @@ if not DATABASE_URL:
 
 logger.info(f"اتصال نهایی: {DATABASE_URL}")
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
+engine = create_engine(DATABASE_URL, 
+                      connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
+                      pool_pre_ping=True,
+                      pool_recycle=300)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -134,6 +145,22 @@ class OTPTemp(Base):
     code_expire_time = Column(DateTime, nullable=False)
     user_data = Column(String(2000), nullable=True)  # ذخیره داده‌های کاربر به صورت JSON
     created_at = Column(DateTime, default=datetime.utcnow)
+
+# جدول جدید برای مناسبت‌های تقویم
+class Occasion(Base):
+    __tablename__ = "occasions"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    jmonth = Column(Integer, nullable=False)  # ماه شمسی
+    jday = Column(Integer, nullable=False)    # روز شمسی
+    title = Column(String(200), nullable=False)
+    description = Column(TEXT, nullable=True)
+    is_holiday = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        Index('idx_occasion_date', 'jmonth', 'jday'),
+    )
 
 class Event(Base):
     __tablename__ = "events"
@@ -260,12 +287,28 @@ def check_and_create_missing_columns():
             logger.info("فیلدهای جدید در users ایجاد شدند")
         
         # بررسی سایر جداول
-        tables_to_check = ['event_participants', 'events', 'comments', 'notifications', 'user_favorites', 'otp_temp']
+        tables_to_check = ['event_participants', 'events', 'comments', 'notifications', 'user_favorites', 'otp_temp', 'occasions']
         
         for table_name in tables_to_check:
             if table_name not in inspector.get_table_names():
                 logger.info(f"ایجاد جدول {table_name}")
-                Base.metadata.tables[table_name].create(bind=engine)
+                if table_name == 'occasions':
+                    # ایجاد جدول occasions
+                    db.execute(text("""
+                    CREATE TABLE IF NOT EXISTS occasions (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        jmonth INT NOT NULL,
+                        jday INT NOT NULL,
+                        title VARCHAR(200) NOT NULL,
+                        description TEXT,
+                        is_holiday BOOLEAN DEFAULT TRUE,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        INDEX idx_occasion_date (jmonth, jday)
+                    )
+                    """))
+                else:
+                    Base.metadata.tables[table_name].create(bind=engine)
                 logger.info(f"جدول {table_name} ایجاد شد")
         
         # بررسی فیلدهای خاص در جداول
@@ -327,6 +370,44 @@ def create_tables():
         
         # بررسی و ایجاد فیلدهای جدید
         check_and_create_missing_columns()
+        
+        # ایجاد مناسبت‌های پیش‌فرض در صورت خالی بودن جدول occasions
+        db = SessionLocal()
+        try:
+            count = db.query(Occasion).count()
+            if count == 0:
+                default_occasions = [
+                    (1, 1, "آغاز سال نو", "آغاز سال نو خورشیدی", True),
+                    (1, 12, "روز جمهوری اسلامی ایران", "روز جمهوری اسلامی ایران", True),
+                    (1, 13, "روز طبیعت", "سیزدهم فروردین، روز طبیعت", True),
+                    (11, 22, "پیروزی انقلاب اسلامی", "سالگرد پیروزی انقلاب اسلامی ایران", True),
+                    (3, 14, "رحلت امام خمینی (ره)", "چهاردهم خرداد، سالگرد رحلت امام خمینی", True),
+                    (12, 29, "روز ملی شدن صنعت نفت", "سالروز ملی شدن صنعت نفت ایران", True),
+                    (9, 17, "قبولی اعمال", "شب هایله القدر", True),
+                    (12, 13, "تولد حضرت علی (ع)", "سیزدهم رجب، ولادت امام اول شیعیان", True),
+                    (7, 27, "مبعث رسول اکرم", "بیست و هفتم رجب، مبعث پیامبر اسلام", True),
+                    (6, 15, "ولادت امام مهدی (عج)", "نیمه شعبان، میلاد امام زمان", True)
+                ]
+                
+                for jmonth, jday, title, description, is_holiday in default_occasions:
+                    occasion = Occasion(
+                        jmonth=jmonth,
+                        jday=jday,
+                        title=title,
+                        description=description,
+                        is_holiday=is_holiday
+                    )
+                    db.add(occasion)
+                
+                db.commit()
+                logger.info(f"{len(default_occasions)} مناسبت پیش‌فرض ایجاد شد")
+            else:
+                logger.info(f"جدول occasions دارای {count} مناسبت است")
+        except Exception as e:
+            logger.error(f"خطا در ایجاد مناسبت‌های پیش‌فرض: {e}")
+            db.rollback()
+        finally:
+            db.close()
         
     except Exception as e:
         logger.error(f"خطا در ایجاد جداول: {e}")
@@ -544,6 +625,26 @@ class CategoryResponse(BaseModel):
     main_category: str
     subcategories: List[str]
 
+# مدل جدید برای مناسبت‌های تقویم
+class OccasionCreate(BaseModel):
+    jmonth: int
+    jday: int
+    title: str
+    description: Optional[str] = None
+    is_holiday: Optional[bool] = True
+
+class OccasionResponse(BaseModel):
+    id: int
+    jmonth: int
+    jday: int
+    title: str
+    description: Optional[str]
+    is_holiday: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 # توابع کمکی برای هش کردن رمز عبور
 def get_password_hash(password: str) -> str:
     """هش ساده رمز عبور با SHA-256 + salt"""
@@ -733,8 +834,6 @@ async def send_otp(request: OTPSendRequest, db: Session = Depends(get_db)):
         db.query(OTPTemp).filter(OTPTemp.email == request.email).delete()
         
         # ذخیره کد در جدول موقت
-        import json
-
         otp_temp = OTPTemp(
             email=request.email,
             phone_number=request.phone_number,
@@ -808,11 +907,7 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
 
         else:
             # ایجاد کاربر جدید
-            import json
-            try:
-                user_data = json.loads(otp_temp.user_data) if otp_temp.user_data else {}
-            except:
-                user_data = {}
+            user_data = json.loads(otp_temp.user_data) if otp_temp.user_data else {}
 
             hashed_password = get_password_hash(user_data.get("password", "DefaultPass123"))
 
@@ -963,7 +1058,6 @@ async def signup_step1(user: SignupStep1Request, db: Session = Depends(get_db)):
         db.query(OTPTemp).filter(OTPTemp.email == user.email).delete()
         
         # ذخیره کد جدید
-        import json
         otp_temp = OTPTemp(
             email=user.email,
             phone_number=user.phone_number,
@@ -2596,6 +2690,450 @@ async def pay_donation(
             detail="خطای سرور در پرداخت نذری"
         )
 
+# ===================== API های جدید برای تقویم =====================
+
+@app.get("/occasions", response_model=Dict[str, List[str]])
+async def get_occasions(db: Session = Depends(get_db)):
+    """
+    دریافت لیست مناسبت‌ها به فرمت مورد نیاز تقویم
+    """
+    try:
+        occasions = db.query(Occasion).all()
+        result = {}
+        
+        for occasion in occasions:
+            key = f"{occasion.jmonth}-{occasion.jday}"
+            if key not in result:
+                result[key] = []
+            result[key].append(occasion.title)
+        
+        return result
+    except Exception as e:
+        logger.error(f"خطا در دریافت مناسبت‌ها: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="خطای سرور در دریافت مناسبت‌ها"
+        )
+
+@app.get("/occasions/{jmonth}/{jday}", response_model=List[OccasionResponse])
+async def get_occasions_by_date(jmonth: int, jday: int, db: Session = Depends(get_db)):
+    """
+    دریافت مناسبت‌های یک تاریخ خاص
+    """
+    try:
+        occasions = db.query(Occasion).filter(
+            Occasion.jmonth == jmonth,
+            Occasion.jday == jday
+        ).all()
+        
+        return occasions
+    except Exception as e:
+        logger.error(f"خطا در دریافت مناسبت‌ها برای تاریخ {jmonth}-{jday}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="خطای سرور در دریافت مناسبت‌ها"
+        )
+
+@app.post("/occasions", response_model=OccasionResponse)
+async def create_occasion(
+    occasion: OccasionCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    ایجاد مناسبت جدید (نیاز به احراز هویت)
+    """
+    try:
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="برای ایجاد مناسبت باید وارد شوید"
+            )
+        
+        # اعتبارسنجی تاریخ
+        if occasion.jmonth < 1 or occasion.jmonth > 12:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ماه باید بین ۱ تا ۱۲ باشد"
+            )
+        
+        if occasion.jday < 1 or occasion.jday > 31:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="روز باید بین ۱ تا ۳۱ باشد"
+            )
+        
+        # بررسی تکراری بودن
+        existing = db.query(Occasion).filter(
+            Occasion.jmonth == occasion.jmonth,
+            Occasion.jday == occasion.jday,
+            Occasion.title == occasion.title
+        ).first()
+        
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="این مناسبت قبلاً ثبت شده است"
+            )
+        
+        new_occasion = Occasion(
+            jmonth=occasion.jmonth,
+            jday=occasion.jday,
+            title=occasion.title,
+            description=occasion.description,
+            is_holiday=occasion.is_holiday
+        )
+        
+        db.add(new_occasion)
+        db.commit()
+        db.refresh(new_occasion)
+        
+        logger.info(f"مناسبت جدید ایجاد شد: {occasion.title} در {occasion.jmonth}/{occasion.jday}")
+        
+        return new_occasion
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"خطا در ایجاد مناسبت: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="خطای سرور در ایجاد مناسبت"
+        )
+
+@app.get("/calendar")
+async def get_calendar_page():
+    """
+    صفحه HTML تقویم
+    """
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="fa" dir="rtl">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>تقویم مناره</title>
+        <style>
+            body {
+                margin: 0;
+                font-family: 'Vazirmatn', sans-serif;
+                background: linear-gradient(to bottom, #e8fffb, #b8f1e6);
+                min-height: 100vh;
+                padding: 16px;
+                box-sizing: border-box;
+            }
+            
+            .calendar-container {
+                max-width: 500px;
+                margin: 0 auto;
+                background: white;
+                border-radius: 15px;
+                padding: 20px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            }
+            
+            .header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-weight: 600;
+                margin-bottom: 20px;
+                padding: 10px;
+                background: linear-gradient(to right, #00c6a7, #1fb6ff);
+                color: white;
+                border-radius: 10px;
+            }
+            
+            .header button {
+                background: rgba(255,255,255,0.2);
+                border: none;
+                color: white;
+                padding: 8px 12px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 16px;
+                transition: background 0.3s;
+            }
+            
+            .header button:hover {
+                background: rgba(255,255,255,0.3);
+            }
+            
+            .weekdays {
+                display: grid;
+                grid-template-columns: repeat(7, 1fr);
+                text-align: center;
+                color: #666;
+                font-size: 14px;
+                margin-bottom: 10px;
+                padding: 10px;
+                background: #f8fafc;
+                border-radius: 8px;
+            }
+            
+            .days {
+                display: grid;
+                grid-template-columns: repeat(7, 1fr);
+                gap: 8px;
+                text-align: center;
+            }
+            
+            .day {
+                height: 45px;
+                border-radius: 10px;
+                background: #f3f4f6;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                font-weight: 500;
+                transition: all 0.2s;
+                user-select: none;
+            }
+            
+            .day:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }
+            
+            .day.today {
+                background: linear-gradient(135deg, #1fb6ff, #00c6a7);
+                color: white;
+                font-weight: 600;
+            }
+            
+            .day.holiday {
+                color: #d32f2f;
+                background: #ffecec;
+                font-weight: 600;
+                border: 2px solid #ffcdd2;
+            }
+            
+            .day.selected {
+                outline: 3px solid #1fb6ff;
+                transform: scale(1.05);
+            }
+            
+            .occasion-box {
+                margin-top: 20px;
+                padding: 15px;
+                background: #f9fafb;
+                border-radius: 12px;
+                font-size: 14px;
+                border-right: 4px solid #00c6a7;
+            }
+            
+            .occasion-title {
+                font-weight: 600;
+                color: #1e293b;
+                margin-bottom: 8px;
+                font-size: 16px;
+            }
+            
+            .occasion-item {
+                padding: 8px 0;
+                border-bottom: 1px dashed #e5e7eb;
+            }
+            
+            .occasion-item:last-child {
+                border-bottom: none;
+            }
+            
+            .no-occasion {
+                text-align: center;
+                color: #94a3b8;
+                padding: 20px;
+                font-style: italic;
+            }
+            
+            .month-title {
+                font-size: 18px;
+                font-weight: 700;
+            }
+            
+            @media (max-width: 480px) {
+                .calendar-container {
+                    padding: 15px;
+                }
+                
+                .day {
+                    height: 40px;
+                    font-size: 14px;
+                }
+                
+                .header {
+                    padding: 8px;
+                }
+                
+                .month-title {
+                    font-size: 16px;
+                }
+            }
+            
+            .back-button {
+                display: inline-block;
+                margin-top: 20px;
+                padding: 10px 20px;
+                background: #00c6a7;
+                color: white;
+                text-decoration: none;
+                border-radius: 25px;
+                font-weight: 600;
+                text-align: center;
+                transition: all 0.3s;
+            }
+            
+            .back-button:hover {
+                background: #00a38c;
+                transform: translateY(-2px);
+            }
+        </style>
+    </head>
+    
+    <body>
+        <div class="calendar-container">
+            <div class="header">
+                <button onclick="prevMonth()">‹</button>
+                <div class="month-title" id="monthTitle"></div>
+                <button onclick="nextMonth()">›</button>
+            </div>
+            
+            <div class="weekdays">
+                <span>ش</span>
+                <span>ی</span>
+                <span>د</span>
+                <span>س</span>
+                <span>چ</span>
+                <span>پ</span>
+                <span>ج</span>
+            </div>
+            
+            <div class="days" id="days"></div>
+            
+            <div class="occasion-box">
+                <div class="occasion-title">مناسبت‌های روز انتخاب شده:</div>
+                <div id="occasionList">
+                    <div class="no-occasion">یک روز را انتخاب کنید</div>
+                </div>
+            </div>
+            
+            <a href="/" class="back-button">بازگشت به سایت</a>
+        </div>
+        
+        <script src="https://cdn.jsdelivr.net/npm/jalaali-js/dist/jalaali.min.js"></script>
+        <script>
+            let today = new Date();
+            let jToday = jalaali.toJalaali(today);
+            
+            let year = jToday.jy;
+            let month = jToday.jm;
+            
+            let occasions = {};
+            
+            // بارگذاری مناسبت‌ها از دیتابیس
+            fetch("/occasions")
+                .then(res => res.json())
+                .then(data => {
+                    occasions = data;
+                    render();
+                })
+                .catch(error => {
+                    console.error("خطا در دریافت مناسبت‌ها:", error);
+                    // استفاده از مناسبت‌های پیش‌فرض در صورت خطا
+                    occasions = {
+                        "1-1": ["آغاز سال نو"],
+                        "1-12": ["روز جمهوری اسلامی ایران"],
+                        "1-13": ["روز طبیعت"],
+                        "11-22": ["پیروزی انقلاب اسلامی"],
+                        "3-14": ["رحلت امام خمینی (ره)"],
+                        "12-29": ["روز ملی شدن صنعت نفت"],
+                        "9-17": ["قبولی اعمال (شب هایله القدر)"],
+                        "12-13": ["تولد حضرت علی (ع)"],
+                        "7-27": ["مبعث رسول اکرم"],
+                        "6-15": ["ولادت امام مهدی (عج)"]
+                    };
+                    render();
+                });
+            
+            const monthNames = [
+                "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+                "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"
+            ];
+            
+            function render() {
+                document.getElementById("monthTitle").innerText =
+                    monthNames[month - 1] + " " + year;
+                
+                const daysEl = document.getElementById("days");
+                daysEl.innerHTML = "";
+                
+                const daysCount = jalaali.jalaaliMonthLength(year, month);
+                
+                for (let d = 1; d <= daysCount; d++) {
+                    const div = document.createElement("div");
+                    div.className = "day";
+                    div.innerText = d;
+                    
+                    if (d === jToday.jd && month === jToday.jm && year === jToday.jy) {
+                        div.classList.add("today");
+                    }
+                    
+                    const key = `${month}-${d}`;
+                    if (occasions[key]) {
+                        div.classList.add("holiday");
+                        div.title = occasions[key].join("، ");
+                    }
+                    
+                    div.onclick = () => {
+                        document.querySelectorAll(".day").forEach(x => x.classList.remove("selected"));
+                        div.classList.add("selected");
+                        
+                        const occasionListEl = document.getElementById("occasionList");
+                        if (occasions[key]) {
+                            occasionListEl.innerHTML = occasions[key].map(occasion => 
+                                `<div class="occasion-item">${occasion}</div>`
+                            ).join("");
+                        } else {
+                            occasionListEl.innerHTML = '<div class="no-occasion">مناسبتی برای این روز ثبت نشده است</div>';
+                        }
+                    };
+                    
+                    daysEl.appendChild(div);
+                }
+            }
+            
+            function nextMonth() {
+                month++;
+                if (month > 12) { 
+                    month = 1; 
+                    year++; 
+                }
+                render();
+            }
+            
+            function prevMonth() {
+                month--;
+                if (month < 1) { 
+                    month = 12; 
+                    year--; 
+                }
+                render();
+            }
+            
+            // انتخاب امروز به صورت خودکار
+            setTimeout(() => {
+                const todayElement = document.querySelector('.day.today');
+                if (todayElement) {
+                    todayElement.click();
+                }
+            }, 100);
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
 @app.on_event("startup")
 async def startup_event():
     """
@@ -2697,6 +3235,10 @@ async def startup_event():
             logger.info(f"{updated_count} رویداد موجود با فیلدهای جدید به‌روزرسانی شدند")
         else:
             logger.info("همه رویدادها به‌روز هستند")
+        
+        # بررسی مناسبت‌ها
+        occasions_count = db.query(Occasion).count()
+        logger.info(f"📅 تعداد مناسبت‌ها در دیتابیس: {occasions_count}")
             
         logger.info(f"🎯 اتصال دیتابیس: {DATABASE_URL}")
         logger.info(f"📱 سرویس پیامکی کاوه‌نگار فعال است")
