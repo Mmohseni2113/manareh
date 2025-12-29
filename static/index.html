@@ -513,7 +513,7 @@
     
         .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 1.2rem;
             padding: 0 1rem;
         }
@@ -535,8 +535,8 @@
         }
     
         .feature-icon {
-            width: 4rem;
-            height: 4rem;
+            width: 3.5rem;
+            height: 3.5rem;
             background: linear-gradient(to bottom right, #ede9fe, #ddd6fe);
             border-radius: 50%;
             display: flex;
@@ -546,20 +546,25 @@
         }
     
         .feature-icon i {
-            font-size: 1.8rem;
+            font-size: 1.5rem;
             color: var(--accent);
         }
     
         .feature-card h3 {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             margin-bottom: 0.8rem;
             color: var(--dark);
+            min-height: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
     
         .feature-card p {
             color: #4b5563;
             margin-bottom: 0.8rem;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
+            line-height: 1.5;
         }
     
         #map, #map-location, #map-welcome, #add-event-map {
@@ -1869,55 +1874,6 @@
             border-color: var(--accent-2);
         }
 
-        /* استایل‌های جدید برای مودال کد ملی */
-        .national-id-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 3000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 1rem;
-        }
-
-        .national-id-modal-content {
-            background: white;
-            border-radius: 1rem;
-            padding: 1.5rem;
-            max-width: 90%;
-            width: 400px;
-            text-align: center;
-            box-shadow: 0 0.625rem 1.875rem rgba(0, 0, 0, 0.2);
-        }
-
-        .national-id-modal-content h3 {
-            margin-bottom: 1rem;
-            color: var(--dark);
-            font-size: 1.3rem;
-        }
-
-        .national-id-modal-content p {
-            margin-bottom: 1.5rem;
-            color: var(--muted);
-            font-size: 0.9rem;
-            line-height: 1.6;
-        }
-
-        .national-id-input {
-            width: 100%;
-            padding: 0.8rem;
-            border-radius: 0.5rem;
-            border: 1px solid rgba(15,23,36,0.1);
-            font-size: 1rem;
-            text-align: center;
-            margin-bottom: 1.5rem;
-            direction: ltr;
-        }
-
         /* استایل‌های جدید برای مودال قوانین */
         .terms-modal {
             position: fixed;
@@ -2333,6 +2289,27 @@
             color: var(--accent);
         }
 
+        /* بخش دانلود در هدر */
+        .download-btn {
+            background: linear-gradient(to right, #10b981, #34d399);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 1.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-0.1875rem);
+            box-shadow: 0 0.3125rem 0.9375rem rgba(16, 185, 129, 0.4);
+        }
+
         /* Media Queries */
         @media (min-width: 768px) {
             section {
@@ -2486,6 +2463,25 @@
             .sub-category-grid {
                 grid-template-columns: repeat(3, 1fr);
             }
+            
+            /* کاهش سایز کارت‌های ویژگی‌ها در موبایل */
+            .feature-icon {
+                width: 3rem;
+                height: 3rem;
+            }
+            
+            .feature-icon i {
+                font-size: 1.3rem;
+            }
+            
+            .feature-card h3 {
+                font-size: 1rem;
+                min-height: auto;
+            }
+            
+            .feature-card p {
+                font-size: 0.8rem;
+            }
         }
 
         @media (max-width: 480px) {
@@ -2528,9 +2524,33 @@
             .stat-cards {
                 grid-template-columns: 1fr;
             }
+            
+            /* بیشتر کردن فشردگی کارت‌های ویژگی‌ها در موبایل کوچک */
+            .feature-card {
+                padding: 0.8rem;
+            }
+            
+            .feature-icon {
+                width: 2.5rem;
+                height: 2.5rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .feature-icon i {
+                font-size: 1rem;
+            }
+            
+            .feature-card h3 {
+                font-size: 0.9rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .feature-card p {
+                font-size: 0.75rem;
+                margin-bottom: 0.5rem;
+            }
         }
 
-        /* استایل‌های ریسپانسیو اضافی */
         @media (max-width: 360px) {
             .otp-input {
                 width: 2rem;
@@ -2633,19 +2653,6 @@
         برگشت
     </button>
 
-    <!-- مودال کد ملی -->
-    <div class="national-id-modal" id="nationalIdModal">
-        <div class="national-id-modal-content">
-            <h3>ثبت کد ملی</h3>
-            <p>برای ادامه، لطفاً کد ملی خود را وارد کنید.</p>
-            <input type="text" id="nationalIdInput" class="national-id-input" maxlength="10" placeholder="کد ملی (10 رقم)" pattern="[0-9]{10}" />
-            <div class="button-group">
-                <button class="btn primary" onclick="submitNationalId()">ثبت کد ملی</button>
-                <button class="btn ghost" onclick="hideNationalIdModal()">انصراف</button>
-            </div>
-        </div>
-    </div>
-
     <!-- مودال قوانین و حریم خصوصی -->
     <div class="terms-modal" id="termsModal">
         <div class="terms-modal-content">
@@ -2660,6 +2667,9 @@
                     <p>با استفاده از پلتفرم مناره، شما با قوانین و مقررات زیر موافقت می‌کنید:</p>
                     <ul>
                         <li>کاربران باید اطلاعات صحیح و معتبر در هنگام ثبت‌نام ارائه دهند.</li>
+                        <li>مسئولیت هرگونه فعالیت از حساب کاربری بر عهده صاحب حساب است.</li>
+                        <li>هرگونه سوءاستفاده از پلتفرم منجر به مسدود شدن حساب می‌شود.</li>
+                        <li>کاربران باید قوانین جمهوری اسلامی ایران را رعایت کنند.</li>
                     </ul>
                 </div>
                 <div id="privacyContent" style="display: none;">
@@ -2667,6 +2677,9 @@
                     <p>حریم خصوصی شما برای ما بسیار مهم است. در اینجا نحوه جمع‌آوری، استفاده و محافظت از اطلاعات شما را توضیح می‌دهیم:</p>
                     <ul>
                         <li>اطلاعات شخصی کاربران نزد ما محفوظ است و در اختیار اشخاص ثالث قرار نمی‌گیرد.</li>
+                        <li>از اطلاعات کاربران تنها برای بهبود خدمات و ارتباط با کاربران استفاده می‌شود.</li>
+                        <li>در صورت درخواست مقامات قضائی، اطلاعات کاربران ارائه خواهد شد.</li>
+                        <li>کاربران می‌توانند درخواست حذف حساب کاربری خود را ارسال کنند.</li>
                     </ul>
                 </div>
             </div>
@@ -2703,6 +2716,10 @@
                         <li><a href="#" class="calendar-btn nav-link">تقویم</a></li>
                         <li><a href="#donations-section" class="nav-link">نذورات</a></li>
                         <li><a href="#contact" class="nav-link">تماس با ما</a></li>
+                        <!-- لینک دانلود در منوی موبایل -->
+                        <li><a href="#" class="download-app-btn nav-link">
+                            <i class="fas fa-download"></i> دانلود اپلیکیشن
+                        </a></li>
                     </ul>
                 </div>
                 
@@ -2716,6 +2733,11 @@
                     <li><a href="#contact" class="nav-link">تماس با ما</a></li>
                 </ul>
                 <div class="header-controls">
+                    <!-- دکمه دانلود -->
+                    <button class="download-btn" id="downloadBtn">
+                        <i class="fas fa-download"></i>
+                        <span>دانلود</span>
+                    </button>
                     <!-- آیکون اطلاع‌رسانی -->
                     <div class="notification-bell" id="notificationBell">
                         <i class="fas fa-bell"></i>
@@ -2850,6 +2872,24 @@
         </section>
         
         <!-- بخش دسته‌بندی رویدادها -->
+        <section class="category-section">
+            <div class="container">
+                <div class="section-title">
+                    <h2>دسته‌بندی رویدادها</h2>
+                    <p>رویداد مورد نظر خود را بر اساس دسته‌بندی انتخاب کنید</p>
+                </div>
+                
+                <div class="category-grid">
+                    <button onclick="selectMainCategory('national')">🇮🇷 ملی</button>
+                    <button onclick="selectMainCategory('religious')">🕌 مذهبی</button>
+                    <button onclick="selectMainCategory('personal')">👨‍👩‍👧‍👦 شخصی</button>
+                    <button onclick="selectMainCategory('cultural')">🎭 فرهنگی و اجتماعی</button>
+                </div>
+                
+                <div id="subCategoryBox" class="sub-category-grid"></div>
+            </div>
+        </section>
+        
         <section class="features" id="features">
             <div class="container">
                 <div class="section-title">
@@ -2950,6 +2990,13 @@
                         </div>
                         <h3>داوطلبی</h3>
                         <p>همکاری در برگزاری مراسم</p>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="donationAmount">مبلغ کمک (تومان)</label>
+                    <div class="custom-amount">
+                        <input type="number" id="donationAmount" placeholder="مبلغ دلخواه را وارد کنید" min="1000" step="1000">
+                        <button class="btn primary" id="setCustomAmount">تأیید مبلغ</button>
                     </div>
                 </div>
                 <div class="form-group">
@@ -3272,17 +3319,13 @@
                     <i class="fas fa-search search-icon"></i>
                 </div>
 
-                <label for="typeSelect" class="muted">نوع رویداد</label>
+                <label for="typeSelect" class="muted">دسته‌بندی رویداد</label>
                 <select id="typeSelect">
-                    <option value="all">تمام دسته‌ها</option>
-                    <option value="religious">مذهبی</option>
-                    <option value="wedding">عروسی</option>
-                    <option value="funeral">عزا</option>
-                    <option value="mawkeb">موکب</option>
-                    <option value="charity">خیریه</option>
-                    <option value="cultural">فرهنگی</option>
-                    <option value="private">خصوصی</option>
-                    <option value="national">ملی</option>
+                    <option value="all">همه دسته‌ها</option>
+                    <option value="national">🇮🇷 ملی</option>
+                    <option value="religious">🕌 مذهبی</option>
+                    <option value="personal">👨‍👩‍👧‍👦 شخصی</option>
+                    <option value="cultural">🎭 فرهنگی و اجتماعی</option>
                 </select>
 
                 <label for="countrySelect" class="muted">کشور</label>
@@ -3400,19 +3443,22 @@
                             <input type="text" id="eventTitle" placeholder="عنوان رویداد" required>
                         </div>
                         <div class="form-group">
-                            <label for="eventType">نوع رویداد *</label>
-                            <select id="eventType" required>
-                                <option value="">انتخاب نوع</option>
-                                <option value="religious">مذهبی</option>
-                                <option value="wedding">عروسی</option>
-                                <option value="funeral">عزا</option>
-                                <option value="mawkeb">موکب</option>
-                                <option value="charity">خیریه</option>
-                                <option value="cultural">فرهنگی</option>
-                                <option value="private">خصوصی</option>
-                                <option value="national">ملی</option>
+                            <label for="eventCategory">دسته‌بندی اصلی *</label>
+                            <select id="eventCategory" required>
+                                <option value="">انتخاب دسته‌بندی</option>
+                                <option value="national">🇮🇷 ملی</option>
+                                <option value="religious">🕌 مذهبی</option>
+                                <option value="personal">👨‍👩‍👧‍👦 شخصی</option>
+                                <option value="cultural">🎭 فرهنگی و اجتماعی</option>
                             </select>
                         </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="eventSubcategory">زیردسته</label>
+                        <select id="eventSubcategory">
+                            <option value="">انتخاب زیردسته (اختیاری)</option>
+                        </select>
                     </div>
 
                     <div class="form-group">
@@ -3422,62 +3468,11 @@
                                 <i class="fas fa-calendar"></i>
                                 <input type="text" id="eventDate" class="persian-date-input" placeholder="انتخاب تاریخ" required readonly>
                             </div>
-                            <div class="time-input-container">
-                                <input type="number" id="eventHour" class="time-input" placeholder="ساعت" min="0" max="23" required>
-                                <span>:</span>
-                                <input type="number" id="eventMinute" class="time-input" placeholder="دقیقه" min="0" max="59" required>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- بخش تکرار رویداد -->
-                    <div class="form-group">
-                        <label>تکرار رویداد</label>
-                        <div class="repeat-options">
-                            <div class="repeat-option">
-                                <input type="radio" id="repeatNone" name="repeatType" value="none" checked>
-                                <label for="repeatNone">بدون تکرار</label>
-                            </div>
-                            <div class="repeat-option">
-                                <input type="radio" id="repeatDaily" name="repeatType" value="daily">
-                                <label for="repeatDaily">روزانه</label>
-                            </div>
-                            <div class="repeat-option">
-                                <input type="radio" id="repeatWeekly" name="repeatType" value="weekly">
-                                <label for="repeatWeekly">هفتگی</label>
-                            </div>
-                            <div class="repeat-option">
-                                <input type="radio" id="repeatMonthly" name="repeatType" value="monthly">
-                                <label for="repeatMonthly">ماهانه</label>
-                            </div>
-                            
-                            <!-- جزئیات تکرار هفتگی -->
-                            <div id="weeklyDetails" class="repeat-details">
-                                <div style="margin-bottom: 0.5rem;">روزهای هفته:</div>
-                                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                                    <label><input type="checkbox" name="repeatDays" value="0"> شنبه</label>
-                                    <label><input type="checkbox" name="repeatDays" value="1"> یکشنبه</label>
-                                    <label><input type="checkbox" name="repeatDays" value="2"> دوشنبه</label>
-                                    <label><input type="checkbox" name="repeatDays" value="3"> سه‌شنبه</label>
-                                    <label><input type="checkbox" name="repeatDays" value="4"> چهارشنبه</label>
-                                    <label><input type="checkbox" name="repeatDays" value="5"> پنجشنبه</label>
-                                    <label><input type="checkbox" name="repeatDays" value="6"> جمعه</label>
-                                </div>
-                            </div>
-                            
-                            <!-- جزئیات تکرار ماهانه -->
-                            <div id="monthlyDetails" class="repeat-details">
-                                <label for="monthlyDay">روز ماه:</label>
-                                <select id="monthlyDay" style="margin-right: 0.5rem; width: 80px;">
-                                    <option value="1">1</option>
-                                    <option value="2">2</option>
-                                    <option value="3">3</option>
-                                    <option value="4">4</option>
-                                    <option value="5">5</option>
-                                    <option value="6">6</option>
-                                    <option value="7">7</option>
-                                    <option value="8">8</option>
-                                    <option value="9">9</option>
+                            <div class="time-input-container" style="display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem;">
+                                <select id="eventHour" style="flex: 1; padding: 0.8rem; border-radius: 0.5rem; border: 1px solid rgba(15,23,36,0.06);">
+                                    <option value="">ساعت</option>
+                                    <option value="08">08</option>
+                                    <option value="09">09</option>
                                     <option value="10">10</option>
                                     <option value="11">11</option>
                                     <option value="12">12</option>
@@ -3491,35 +3486,15 @@
                                     <option value="20">20</option>
                                     <option value="21">21</option>
                                     <option value="22">22</option>
-                                    <option value="23">23</option>
-                                    <option value="24">24</option>
-                                    <option value="25">25</option>
-                                    <option value="26">26</option>
-                                    <option value="27">27</option>
-                                    <option value="28">28</option>
-                                    <option value="29">29</option>
-                                    <option value="30">30</option>
-                                    <option value="31">31</option>
                                 </select>
-                            </div>
-                            
-                            <!-- تنظیمات پایانی تکرار -->
-                            <div style="margin-top: 0.8rem;">
-                                <label>پایان تکرار:</label>
-                                <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;">
-                                    <label style="display: flex; align-items: center; gap: 0.5rem;">
-                                        <input type="radio" name="repeatEnd" value="never" checked> بدون پایان
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <input type="radio" name="repeatEnd" value="date"> تا تاریخ
-                                        <input type="text" id="repeatEndDate" class="persian-date-input" placeholder="انتخاب تاریخ" style="width: 120px;" readonly>
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <input type="radio" name="repeatEnd" value="occurrences"> پس از
-                                        <input type="number" id="repeatOccurrences" min="2" max="365" value="10" style="width: 60px;">
-                                        بار
-                                    </label>
-                                </div>
+                                <span>:</span>
+                                <select id="eventMinute" style="flex: 1; padding: 0.8rem; border-radius: 0.5rem; border: 1px solid rgba(15,23,36,0.06);">
+                                    <option value="">دقیقه</option>
+                                    <option value="00">00</option>
+                                    <option value="15">15</option>
+                                    <option value="30">30</option>
+                                    <option value="45">45</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -3533,7 +3508,7 @@
                         <label>موقعیت روی نقشه *</label>
                         <div class="map-container">
                             <div id="add-event-map"></div>
-                            <div class="map-loading" id="mapLoading">
+                            <div class="map-loading" id="mapLoading" style="display: none;">
                                 <p>در حال بارگذاری نقشه...</p>
                             </div>
                         </div>
@@ -3593,7 +3568,6 @@
         // داده‌های دسته‌بندی
         const subCategories = {
             national: [
-                "روز ملی",
                 "مراسم دولتی",
                 "بزرگداشت شهدا",
                 "یادبود شخصیت‌های ملی",
@@ -3694,9 +3668,6 @@
             
             // نمایش پیام موفقیت
             showModal('دسته‌بندی', `دسته‌بندی "${name}" از بخش "${getMainCategoryName(mainCategory)}" انتخاب شد.`, 'success');
-            
-            // اینجا می‌توانید کد اتصال به فرم ثبت رویداد را اضافه کنید
-            // مثلاً پر کردن فیلد نوع رویداد در فرم ثبت رویداد
         }
 
         function getMainCategoryName(category) {
@@ -3721,56 +3692,6 @@
             }
             
             return headers;
-        }
-
-        // تابع‌های مودال کد ملی
-        function showNationalIdModal(actionCallback) {
-            pendingAction = actionCallback;
-            document.getElementById('nationalIdModal').style.display = 'flex';
-            document.getElementById('nationalIdInput').focus();
-        }
-
-        function hideNationalIdModal() {
-            document.getElementById('nationalIdModal').style.display = 'none';
-            document.getElementById('nationalIdInput').value = '';
-            pendingAction = null;
-        }
-
-        async function submitNationalId() {
-            const nationalId = document.getElementById('nationalIdInput').value.trim();
-            
-            if (!nationalId || nationalId.length !== 10 || !/^\d+$/.test(nationalId)) {
-                showModal('خطا', 'لطفاً یک کد ملی معتبر 10 رقمی وارد کنید.', 'error');
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${API_BASE_URL}/users/add-national-id`, {
-                    method: 'POST',
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify({ national_id: nationalId })
-                });
-                
-                if (response.ok) {
-                    showModal('موفقیت', 'کد ملی با موفقیت ثبت شد.', 'success');
-                    hideNationalIdModal();
-                    
-                    // به‌روزرسانی اطلاعات کاربر
-                    currentUserData.national_id = nationalId;
-                    localStorage.setItem('userData', JSON.stringify(currentUserData));
-                    
-                    // اجرای عملیات معلق
-                    if (pendingAction) {
-                        pendingAction();
-                    }
-                } else {
-                    const error = await response.json();
-                    showModal('خطا', error.detail || 'خطا در ثبت کد ملی', 'error');
-                }
-            } catch (error) {
-                console.error('خطا در ثبت کد ملی:', error);
-                showModal('خطا', 'خطا در ارتباط با سرور', 'error');
-            }
         }
 
         // تابع‌های مودال قوانین
@@ -4079,6 +4000,9 @@
                     
                     this.maps.events = map;
                     
+                    // پنهان کردن loading
+                    document.getElementById('mapLoading')?.style.display = 'none';
+                    
                     // بارگذاری رویدادهای واقعی
                     this.loadEventsForEventsMap();
                     
@@ -4200,6 +4124,9 @@
                     
                     this.maps.addEvent = map;
                     
+                    // پنهان کردن loading
+                    document.getElementById('mapLoading')?.style.display = 'none';
+                    
                 } catch (error) {
                     console.error("❌ خطا در راه‌اندازی نقشه اضافه کردن رویداد:", error);
                     this.showMapError('add-event-map', 'خطا در بارگذاری نقشه');
@@ -4269,7 +4196,7 @@
             }
         };
 
-        // مدیریت OTP - اصلاح شده برای ورود از چپ به راست
+        // مدیریت OTP - اصلاح شده برای ورود خودکار به خانه بعدی
         const OTPManager = {
             timer: null,
             timeLeft: 120,
@@ -4299,7 +4226,7 @@
                     resendOtpBtn.addEventListener('click', this.resendOTP.bind(this));
                 }
                 
-                // مدیریت ورودی OTP برای ورود از چپ به راست
+                // مدیریت ورودی OTP برای ورود خودکار به خانه بعدی
                 otpInputs.forEach((input, index) => {
                     // تنظیم جهت برای نمایش اعداد
                     input.dir = 'ltr';
@@ -4316,7 +4243,9 @@
                         
                         // اگر عدد وارد شد و جعبه بعدی وجود دارد، به آن برو
                         if (value && index < otpInputs.length - 1) {
-                            otpInputs[index + 1].focus();
+                            setTimeout(() => {
+                                otpInputs[index + 1].focus();
+                            }, 10);
                         }
                         
                         // اگر آخرین جعبه پر شد، دکمه تأیید را فعال کن
@@ -4328,6 +4257,13 @@
                             // اگر جعبه خالی است و backspace زده شد، به جعبه قبلی برو
                             setTimeout(() => {
                                 otpInputs[index - 1].focus();
+                            }, 10);
+                        }
+                        
+                        // اگر عدد وارد شد، به جعبه بعدی برو
+                        if (/^\d$/.test(e.key) && index < otpInputs.length - 1) {
+                            setTimeout(() => {
+                                otpInputs[index + 1].focus();
                             }, 10);
                         }
                     });
@@ -4598,13 +4534,6 @@
                     }.bind(this));
                 });
                 
-                // رویدادهای کلیک برای مبلغ‌های پیشنهادی
-                document.querySelectorAll('.amount-btn').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        this.selectAmount(btn);
-                    }.bind(this));
-                });
-                
                 // رویداد کلیک برای دکمه پرداخت
                 const donateBtn = document.getElementById('donateBtn');
                 if (donateBtn) {
@@ -4633,33 +4562,12 @@
                 console.log(`🎯 نوع نذری انتخاب شد: ${this.selectedType}`);
             },
             
-            selectAmount(btn) {
-                // حذف انتخاب از همه دکمه‌ها
-                document.querySelectorAll('.amount-btn').forEach(button => {
-                    button.classList.remove('selected');
-                });
-                
-                // انتخاب دکمه جدید
-                btn.classList.add('selected');
-                
-                const amount = btn.getAttribute('data-amount');
-                document.getElementById('donationAmount').value = amount;
-                this.selectedAmount = amount;
-                
-                console.log(`💰 مبلغ انتخاب شد: ${amount} تومان`);
-            },
-            
             setCustomAmount() {
                 const customAmount = document.getElementById('donationAmount').value;
                 if (!customAmount || customAmount < 1000) {
                     showModal('خطا', 'لطفاً مبلغ معتبری وارد کنید (حداقل ۱,۰۰۰ تومان).', 'error');
                     return;
                 }
-                
-                // حذف انتخاب از دکمه‌های مبلغ ثابت
-                document.querySelectorAll('.amount-btn').forEach(btn => {
-                    btn.classList.remove('selected');
-                });
                 
                 this.selectedAmount = customAmount;
                 console.log(`💰 مبلغ دلخواه تنظیم شد: ${customAmount} تومان`);
@@ -4728,10 +4636,6 @@
                     opt.classList.remove('selected');
                 });
                 
-                document.querySelectorAll('.amount-btn').forEach(btn => {
-                    btn.classList.remove('selected');
-                });
-                
                 document.getElementById('donationAmount').value = '';
                 
                 this.selectedType = null;
@@ -4747,7 +4651,6 @@
             activeId: null,
             userRegistrations: new Set(),
             userFavorites: new Set(),
-            autoRefreshInterval: null,
          
             async loadEventsPage(forceRefresh = false) {
                 try {
@@ -4783,57 +4686,11 @@
                     // راه‌اندازی نقشه
                     MapManager.initializeEventsMap();
                     
-                    // راه‌اندازی به‌روزرسانی خودکار
-                    this.startAutoRefresh();
-                    
                 } catch (error) {
                     console.warn('❌ API failed:', error);
                     this.events = [];
                     this.initFilters();
                     this.applyFilters();
-                }
-            },
-
-            // تابع جدید برای راه‌اندازی به‌روزرسانی خودکار
-            startAutoRefresh() {
-                // پاک کردن interval قبلی اگر وجود دارد
-                if (this.autoRefreshInterval) {
-                    clearInterval(this.autoRefreshInterval);
-                }
-                
-                // تنظیم interval جدید برای به‌روزرسانی هر 30 ثانیه
-                this.autoRefreshInterval = setInterval(() => {
-                    this.refreshEvents(true);
-                }, 30000); // 30 ثانیه
-            },
-
-            // تابع جدید برای رفرش دستی
-            async refreshEvents(silent = false) {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/events/public`);
-                    
-                    if (response.ok) {
-                        this.events = await response.json();
-                        console.log(`🔄 ${this.events.length} رویداد به‌روزرسانی شد`);
-                        
-                        if (token) {
-                            await this.loadUserRegistrations();
-                            await this.loadUserFavorites();
-                        }
-                        
-                        this.applyFilters();
-                        MapManager.initializeEventsMap(); // رفرش نقشه
-                        
-                        if (!silent) {
-                            showModal('بروزرسانی', 'لیست رویدادها با موفقیت بروزرسانی شد.', 'success');
-                            setTimeout(hideModal, 2000);
-                        }
-                    }
-                } catch (error) {
-                    console.warn('خطا در به‌روزرسانی رویدادها:', error);
-                    if (!silent) {
-                        showModal('خطا', 'خطا در به‌روزرسانی رویدادها.', 'error');
-                    }
                 }
             },
             
@@ -4874,8 +4731,9 @@
                 const clearFiltersBtn = document.getElementById('clearFiltersBtn');
                 const refreshBtn = document.getElementById('refreshBtn');
                 const searchInput = document.getElementById('searchInput');
+                const typeSelect = document.getElementById('typeSelect');
                 
-                if (!countrySelect || !provinceSelect || !citySelect || !clearFiltersBtn) {
+                if (!countrySelect || !provinceSelect || !citySelect || !clearFiltersBtn || !typeSelect) {
                     console.error('❌ المان‌های فیلتر یافت نشدند');
                     return;
                 }
@@ -4895,6 +4753,11 @@
                 
                 // پر کردن شهرها بر اساس استان انتخاب شده
                 this.populateCities();
+                
+                // مدیریت دسته‌بندی
+                typeSelect.addEventListener('change', () => {
+                    this.applyFilters();
+                });
              
                 countrySelect.addEventListener('change', () => {
                     this.populateProvinces();
@@ -4905,8 +4768,7 @@
                     this.populateCities();
                     this.applyFilters();
                 });
-             
-                document.getElementById('typeSelect').addEventListener('change', () => this.applyFilters());
+                
                 citySelect.addEventListener('change', () => this.applyFilters());
                 
                 // جستجوی پیشرفته
@@ -4917,7 +4779,7 @@
                 }
                 
                 clearFiltersBtn.addEventListener('click', () => {
-                    document.getElementById('typeSelect').value = 'all';
+                    typeSelect.value = 'all';
                     countrySelect.value = 'all';
                     provinceSelect.innerHTML = '<option value="all">همه استان‌ها</option>';
                     citySelect.innerHTML = '<option value="all">همه شهرها</option>';
@@ -4928,7 +4790,7 @@
                 // اضافه کردن event listener برای دکمه رفرش
                 if (refreshBtn) {
                     refreshBtn.addEventListener('click', () => {
-                        this.refreshEvents();
+                        this.loadEventsPage(true);
                     });
                 }
              
@@ -5019,9 +4881,20 @@
                 const searchFilter = document.getElementById('searchInput')?.value.toLowerCase() || '';
                 
                 this.filtered = this.events.filter(event => {
-                    // فیلتر نوع
-                    if (typeFilter !== 'all' && event.type !== typeFilter) {
-                        return false;
+                    // فیلتر نوع (دسته‌بندی)
+                    if (typeFilter !== 'all') {
+                        // نگاشت دسته‌بندی‌های جدید به نوع‌های قدیمی
+                        const categoryMap = {
+                            'national': 'national',
+                            'religious': 'religious',
+                            'personal': 'private',
+                            'cultural': 'cultural'
+                        };
+                        
+                        const mappedType = categoryMap[typeFilter];
+                        if (mappedType && event.type !== mappedType) {
+                            return false;
+                        }
                     }
                     
                     // فیلتر کشور
@@ -5115,21 +4988,10 @@
                     return;
                 }
                 
-                // بررسی کد ملی کاربر
-                if (!currentUserData.national_id) {
-                    showNationalIdModal(() => {
-                        this.registerForEvent(eventId);
-                    });
-                    return;
-                }
-                
                 try {
-                    const response = await fetch(`${API_BASE_URL}/events/${eventId}/register-with-national-id`, {
+                    const response = await fetch(`${API_BASE_URL}/events/${eventId}/register`, {
                         method: 'POST',
-                        headers: getAuthHeaders(),
-                        body: JSON.stringify({
-                            national_id: currentUserData.national_id
-                        })
+                        headers: getAuthHeaders()
                     });
                     
                     if (response.ok) {
@@ -5665,6 +5527,20 @@
                 });
             });
             
+            // event listener برای دکمه دانلود
+            document.getElementById('downloadBtn').addEventListener('click', function(e) {
+                e.preventDefault();
+                showModal('دانلود اپلیکیشن', 'اپلیکیشن مناره به زودی در دسترس قرار خواهد گرفت.', 'info');
+            });
+            
+            // event listener برای دکمه دانلود در منوی موبایل
+            document.querySelectorAll('.download-app-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showModal('دانلود اپلیکیشن', 'اپلیکیشن مناره به زودی در دسترس قرار خواهد گرفت.', 'info');
+                });
+            });
+            
             // event listener برای دکمه‌های خاص
             document.querySelectorAll('.digital-library-btn').forEach(btn => {
                 btn.addEventListener('click', function(e) {
@@ -5711,7 +5587,8 @@
                     
                     // اعتبارسنجی فرم
                     const title = document.getElementById('eventTitle').value;
-                    const type = document.getElementById('eventType').value;
+                    const category = document.getElementById('eventCategory').value;
+                    const subcategory = document.getElementById('eventSubcategory').value;
                     const date = document.getElementById('eventDate').value;
                     const hour = document.getElementById('eventHour').value;
                     const minute = document.getElementById('eventMinute').value;
@@ -5719,7 +5596,7 @@
                     const address = document.getElementById('eventAddress').value;
                     const capacity = document.getElementById('eventCapacity').value;
                     
-                    if (!title || !type || !date || !hour || !minute || !organizer || !address || !capacity) {
+                    if (!title || !category || !date || !hour || !minute || !organizer || !address || !capacity) {
                         showModal('خطا', 'لطفاً تمام فیلدهای ضروری را پر کنید.', 'error');
                         return;
                     }
@@ -5741,7 +5618,9 @@
                             longitude: 51.3890, // باید از نقشه گرفته شود
                             host: organizer,
                             creator: currentUserId,
-                            type: type,
+                            type: category, // استفاده از دسته‌بندی به جای type قدیمی
+                            category: category,
+                            subcategory: subcategory || '',
                             city: currentUserData.city || 'تهران',
                             province: currentUserData.province || 'تهران',
                             country: currentUserData.country || 'iran',
@@ -5835,6 +5714,23 @@
                 }
             });
             
+            // event listener برای دسته‌بندی در فرم ثبت رویداد
+            document.getElementById('eventCategory').addEventListener('change', function() {
+                const category = this.value;
+                const subcategorySelect = document.getElementById('eventSubcategory');
+                
+                subcategorySelect.innerHTML = '<option value="">انتخاب زیردسته (اختیاری)</option>';
+                
+                if (category && subCategories[category]) {
+                    subCategories[category].forEach(sub => {
+                        const option = document.createElement('option');
+                        option.value = sub;
+                        option.textContent = sub;
+                        subcategorySelect.appendChild(option);
+                    });
+                }
+            });
+            
             // event listener برای دکمه‌های CTA
             document.getElementById('startButton').addEventListener('click', function() {
                 if (token) {
@@ -5869,9 +5765,20 @@
                     }
                 });
             });
-            
 
             // event listener برای دکمه‌های پروفایل
+            document.getElementById('profileSignupBtn').addEventListener('click', function() {
+                navigateTo('authPage');
+                showTab('signup');
+                profileCard.classList.remove('active');
+            });
+
+            document.getElementById('profileLoginBtn').addEventListener('click', function() {
+                navigateTo('authPage');
+                showTab('login');
+                profileCard.classList.remove('active');
+            });
+            
             document.querySelectorAll('.profile-option').forEach(option => {
                 option.addEventListener('click', function(e) {
                     e.preventDefault();
@@ -5947,6 +5854,16 @@
             // event listener برای بستن بخش نظرات
             document.getElementById('closeCommentsBtn').addEventListener('click', function() {
                 document.getElementById('commentsSection').style.display = 'none';
+            });
+            
+            // راه‌اندازی تاریخ‌شکن فارسی
+            $(document).ready(function() {
+                $('.persian-date-input').persianDatepicker({
+                    format: 'YYYY/MM/DD',
+                    observer: true,
+                    persianDigit: true,
+                    autoClose: true
+                });
             });
             
             // لود خودکار رویدادها پس از ورود
