@@ -104,7 +104,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 # تنظیمات کاوه‌نگار - استفاده از متغیرهای محیطی
 KAVENEGAR_API_KEY = os.getenv("KAVENEGAR_API_KEY", "6A6F54654839584E356A6633743272783851717A6C7663667477615357533163595267372B68446636426B3D")
 
-# مدل‌های دیتابیس - اصلاح شده برای nullable بودن national_id
+# مدل‌های دیتابیس - حذف national_id از User
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -114,7 +114,6 @@ class User(Base):
     phone_number = Column(String(15), unique=True, nullable=False, index=True)
     phone_prefix = Column(String(5), default="+98")
     password = Column(String(255), nullable=False)
-    national_id = Column(String(10), nullable=True, unique=True)  # تغییر به nullable=True و unique
     country = Column(String(50), nullable=False)
     province = Column(String(50), nullable=False)
     city = Column(String(50), nullable=False)
@@ -148,6 +147,8 @@ class Event(Base):
     creator = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     type = Column(String(20), default="religious")
+    category = Column(String(50), default="مذهبی")  # دسته اصلی
+    subcategory = Column(String(50), default="")  # زیردسته
     city = Column(String(50), default="تهران")
     province = Column(String(50), default="تهران")
     country = Column(String(50), default="iran")
@@ -172,7 +173,6 @@ class EventParticipant(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     registered_at = Column(DateTime, default=datetime.utcnow)
     attended = Column(Boolean, default=False)
-    national_id_used = Column(String(10), nullable=True)
 
 class Notification(Base):
     __tablename__ = "notifications"
@@ -201,25 +201,37 @@ def check_and_create_missing_columns():
         # بررسی فیلدهای users
         users_columns = [col['name'] for col in inspector.get_columns('users')]
         
-        # بررسی و اصلاح فیلد national_id
+        # حذف فیلد national_id اگر وجود دارد
         if 'national_id' in users_columns:
-            # بررسی اینکه آیا فیلد nullable است
             try:
-                db.execute(text("ALTER TABLE users MODIFY national_id VARCHAR(10) NULL"))
-                logger.info("فیلد national_id به nullable تغییر یافت")
+                # ابتدا ایندکس را حذف کن
+                try:
+                    db.execute(text("DROP INDEX IF EXISTS uq_users_national_id ON users"))
+                except:
+                    pass
+                # سپس ستون را حذف کن
+                db.execute(text("ALTER TABLE users DROP COLUMN national_id"))
+                logger.info("فیلد national_id حذف شد")
             except Exception as e:
-                logger.info(f"فیلد national_id قبلاً nullable است: {e}")
-        else:
-            # اگر فیلد وجود ندارد، آن را ایجاد کن
-            db.execute(text("ALTER TABLE users ADD COLUMN national_id VARCHAR(10) NULL"))
-            logger.info("فیلد national_id ایجاد شد")
+                logger.info(f"خطا در حذف فیلد national_id: {e}")
         
-        # ایجاد ایندکس unique برای national_id
-        try:
-            db.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_users_national_id ON users(national_id)"))
-            logger.info("ایندکس unique برای national_id ایجاد شد")
-        except Exception as e:
-            logger.info(f"ایندکس unique برای national_id قبلاً وجود دارد: {e}")
+        # بررسی فیلدهای events
+        events_columns = [col['name'] for col in inspector.get_columns('events')]
+        
+        # اضافه کردن فیلدهای category و subcategory اگر وجود ندارند
+        if 'category' not in events_columns:
+            try:
+                db.execute(text("ALTER TABLE events ADD COLUMN category VARCHAR(50) DEFAULT 'مذهبی'"))
+                logger.info("فیلد category در events ایجاد شد")
+            except Exception as e:
+                logger.info(f"فیلد category قبلاً وجود دارد: {e}")
+        
+        if 'subcategory' not in events_columns:
+            try:
+                db.execute(text("ALTER TABLE events ADD COLUMN subcategory VARCHAR(50) DEFAULT ''"))
+                logger.info("فیلد subcategory در events ایجاد شد")
+            except Exception as e:
+                logger.info(f"فیلد subcategory قبلاً وجود دارد: {e}")
         
         # بررسی فیلدهای دیگر
         missing_columns = []
@@ -275,7 +287,7 @@ def check_and_create_missing_columns():
                     elif col == 'city':
                         db.execute(text("ALTER TABLE events ADD COLUMN city VARCHAR(50) DEFAULT 'تهران'"))
                     elif col == 'province':
-                        db.execute(text("ALTER TABLE events ADD COLUMN province VARCHAR(50) DEFAULT 'تهران'"))
+                        db.execute(text("ALTER TABLE users ADD COLUMN province VARCHAR(50) DEFAULT 'تهران'"))
                     elif col == 'country':
                         db.execute(text("ALTER TABLE events ADD COLUMN country VARCHAR(50) DEFAULT 'iran'"))
                     elif col == 'capacity':
@@ -346,7 +358,6 @@ class UserResponse(BaseModel):
     first_name: str
     last_name: str
     email: str
-    national_id: Optional[str] = None
     phone_number: str
     country: str
     province: str
@@ -368,6 +379,8 @@ class EventCreate(BaseModel):
     host: str
     creator: int
     type: Optional[str] = "religious"
+    category: Optional[str] = "مذهبی"
+    subcategory: Optional[str] = ""
     city: Optional[str] = None
     province: Optional[str] = None
     country: Optional[str] = "iran"
@@ -387,6 +400,8 @@ class EventResponse(BaseModel):
     creator: int
     created_at: datetime
     type: Optional[str] = "religious"
+    category: Optional[str] = "مذهبی"
+    subcategory: Optional[str] = ""
     city: Optional[str] = None
     province: Optional[str] = None
     country: Optional[str] = "iran"
@@ -398,6 +413,7 @@ class EventResponse(BaseModel):
     comment_count: Optional[int] = 0
     current_participants: Optional[int] = 0
     is_favorite: Optional[bool] = False
+    is_registered: Optional[bool] = False
 
     class Config:
         from_attributes = True
@@ -423,7 +439,6 @@ class CommentResponse(BaseModel):
 class EventParticipantCreate(BaseModel):
     event_id: int
     user_id: int
-    national_id: Optional[str] = None
 
 class EventParticipantResponse(BaseModel):
     id: int
@@ -432,7 +447,6 @@ class EventParticipantResponse(BaseModel):
     registered_at: datetime
     attended: bool
     user_name: str
-    national_id_used: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -519,9 +533,16 @@ class SignupStep1Response(BaseModel):
     phone_number: str
     requires_verification: bool = True
 
-# مدل جدید برای اضافه کردن کد ملی - اضافه شده
-class AddNationalIdRequest(BaseModel):
-    national_id: str
+# مدل جدید برای نذورات
+class DonationCreate(BaseModel):
+    donation_type: str
+    amount: float
+    payment_method: str = "card"
+
+# مدل جدید برای دسته‌بندی
+class CategoryResponse(BaseModel):
+    main_category: str
+    subcategories: List[str]
 
 # توابع کمکی برای هش کردن رمز عبور
 def get_password_hash(password: str) -> str:
@@ -659,45 +680,6 @@ async def check_duplicate_user(email: str, phone_number: str, db: Session) -> No
             detail="این شماره تلفن قبلاً ثبت شده است"
         )
 
-# تابع اعتبارسنجی کد ملی - بهبود یافته
-def is_valid_national_code(code: str) -> bool:
-    """
-    اعتبارسنجی کد ملی ایرانی
-    """
-    if not code or not isinstance(code, str):
-        return False
-    
-    # حذف فاصله و کاراکترهای غیرعددی
-    code = code.strip()
-    
-    # بررسی طول
-    if len(code) != 10:
-        return False
-    
-    # بررسی اینکه همه کاراکترها عدد هستند
-    if not code.isdigit():
-        return False
-    
-    # بررسی کدهای غیرمجاز (همه ارقام یکسان)
-    if code == code[0] * 10:
-        return False
-    
-    try:
-        # الگوریتم اعتبارسنجی کد ملی
-        sum = 0
-        for i in range(9):
-            sum += int(code[i]) * (10 - i)
-        
-        remainder = sum % 11
-        control_digit = int(code[9])
-        
-        if remainder < 2:
-            return control_digit == remainder
-        else:
-            return control_digit == (11 - remainder)
-    except:
-        return False
-
 # 📤 ارسال OTP
 @app.post("/send-otp")
 async def send_otp(request: OTPSendRequest, db: Session = Depends(get_db)):
@@ -795,7 +777,7 @@ async def send_otp(request: OTPSendRequest, db: Session = Depends(get_db)):
             detail="خطای سرور در ارسال کد تأیید"
         )
 
-# 📩 تایید کد OTP و فعال‌سازی حساب کاربری - اصلاح شده برای nullable بودن national_id
+# 📩 تایید کد OTP و فعال‌سازی حساب کاربری
 @app.post("/verify-otp", response_model=OTPVerifyResponse)
 async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
     try:
@@ -825,7 +807,7 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
             db.refresh(user)
 
         else:
-            # ایجاد کاربر جدید بدون کد ملی
+            # ایجاد کاربر جدید
             import json
             try:
                 user_data = json.loads(otp_temp.user_data) if otp_temp.user_data else {}
@@ -834,7 +816,7 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
 
             hashed_password = get_password_hash(user_data.get("password", "DefaultPass123"))
 
-            # ایجاد کاربر بدون کد ملی (national_id = None)
+            # ایجاد کاربر
             user = User(
                 first_name=user_data.get("first_name", ""),
                 last_name=user_data.get("last_name", ""),
@@ -847,8 +829,7 @@ async def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
                 password=hashed_password,
                 is_verified=True,
                 has_accepted_terms=user_data.get("has_accepted_terms", False),
-                phone_prefix=user_data.get("phone_prefix", "+98"),
-                national_id=None  # صراحتاً None قرار می‌دهیم
+                phone_prefix=user_data.get("phone_prefix", "+98")
             )
             
             try:
@@ -1024,76 +1005,7 @@ async def signup_step1(user: SignupStep1Request, db: Session = Depends(get_db)):
             detail=f"خطای سرور در ثبت‌نام: {str(e)}"
         )
 
-# 🎯 API برای ثبت کد ملی - اضافه شده
-@app.post("/users/add-national-id")
-async def add_national_id(
-    request: AddNationalIdRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    اضافه کردن کد ملی برای کاربر بعد از ثبت‌نام
-    """
-    try:
-        if not current_user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="برای ثبت کد ملی باید وارد شوید"
-            )
-        
-        # اگر کاربر قبلاً کد ملی دارد
-        if current_user.national_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="کد ملی قبلاً ثبت شده است"
-            )
-        
-        # اعتبارسنجی کد ملی
-        national_id = request.national_id.strip()
-        
-        # استفاده از تابع اعتبارسنجی واقعی
-        if not is_valid_national_code(national_id):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="کد ملی معتبر نیست"
-            )
-        
-        # بررسی تکراری بودن کد ملی
-        existing_user = db.query(User).filter(User.national_id == national_id).first()
-        if existing_user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="این کد ملی قبلاً ثبت شده است"
-            )
-        
-        # ذخیره کد ملی
-        current_user.national_id = national_id
-        db.commit()
-        
-        logger.info(f"کد ملی برای کاربر {current_user.email} ثبت شد")
-        
-        return {
-            "message": "کد ملی با موفقیت ثبت شد",
-            "national_id": national_id
-        }
-        
-    except HTTPException:
-        raise
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="این کد ملی قبلاً ثبت شده است"
-        )
-    except Exception as e:
-        db.rollback()
-        logger.error(f"خطا در ثبت کد ملی: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="خطای سرور در ثبت کد ملی"
-        )
-
-# 🎯 API برای ثبت‌نام در رویداد با بررسی کد ملی
+# 🎯 API برای ثبت‌نام در رویداد
 @app.post("/events/{event_id}/register")
 async def register_for_event(
     event_id: int,
@@ -1101,20 +1013,13 @@ async def register_for_event(
     db: Session = Depends(get_db)
 ):
     """
-    ثبت‌نام در رویداد با بررسی کد ملی
+    ثبت‌نام در رویداد
     """
     try:
         if not current_user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="برای ثبت‌نام در رویداد باید وارد شوید"
-            )
-        
-        # بررسی کد ملی کاربر
-        if not current_user.national_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="برای ثبت‌نام در رویداد، ابتدا کد ملی خود را ثبت کنید"
             )
         
         event = db.query(Event).filter(Event.id == event_id).first()
@@ -1144,8 +1049,7 @@ async def register_for_event(
         
         registration = EventParticipant(
             event_id=event_id,
-            user_id=current_user.id,
-            national_id_used=current_user.national_id
+            user_id=current_user.id
         )
         db.add(registration)
         db.commit()
@@ -1163,8 +1067,7 @@ async def register_for_event(
         
         return {
             "message": "ثبت‌نام با موفقیت انجام شد",
-            "registration_id": registration.id,
-            "national_id_used": current_user.national_id
+            "registration_id": registration.id
         }
         
     except HTTPException:
@@ -1177,96 +1080,11 @@ async def register_for_event(
             detail="خطای سرور در ثبت‌نام"
         )
 
-# 🎯 API جایگزین برای ثبت‌نام در رویداد با کد ملی
-@app.post("/events/{event_id}/register-with-national-id")
-async def register_for_event_with_national_id(
-    event_id: int,
-    national_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    ثبت‌نام در رویداد با کد ملی
-    """
-    try:
-        if not current_user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="برای ثبت‌نام در رویداد باید وارد شوید"
-            )
-        
-        # بررسی کد ملی
-        if not national_id or not national_id.isdigit() or len(national_id) != 10:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="کد ملی باید 10 رقم باشد"
-            )
-        
-        event = db.query(Event).filter(Event.id == event_id).first()
-        if not event:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="رویداد یافت نشد"
-            )
-        
-        existing_registration = db.query(EventParticipant).filter(
-            EventParticipant.event_id == event_id,
-            EventParticipant.user_id == current_user.id
-        ).first()
-        
-        if existing_registration:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="شما قبلاً در این رویداد ثبت‌نام کرده‌اید"
-            )
-        
-        current_participants = db.query(EventParticipant).filter(EventParticipant.event_id == event_id).count()
-        if current_participants >= event.capacity:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="ظرفیت رویداد تکمیل شده است"
-            )
-        
-        registration = EventParticipant(
-            event_id=event_id,
-            user_id=current_user.id,
-            national_id_used=national_id
-        )
-        db.add(registration)
-        db.commit()
-        db.refresh(registration)
-        
-        # ایجاد نوتیفیکیشن
-        notification = Notification(
-            user_id=current_user.id,
-            title="ثبت‌نام موفق",
-            message=f"شما با موفقیت در رویداد '{event.title}' ثبت‌نام کردید.",
-            type="success"
-        )
-        db.add(notification)
-        db.commit()
-        
-        return {
-            "message": "ثبت‌نام با موفقیت انجام شد",
-            "registration_id": registration.id,
-            "national_id_used": national_id
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        logger.error(f"خطا در ثبت‌نام: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="خطای سرور در ثبت‌نام"
-        )
-
-# 🎯 API برای ایجاد رویداد با بررسی کد ملی
+# 🎯 API برای ایجاد رویداد
 @app.post("/events", response_model=EventResponse)
 async def create_event(event: EventCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
-    ایجاد رویداد جدید با بررسی کد ملی سازنده
+    ایجاد رویداد جدید
     """
     try:
         logger.info(f"دریافت درخواست ایجاد رویداد از کاربر: {current_user.email if current_user else 'Anonymous'}")
@@ -1275,13 +1093,6 @@ async def create_event(event: EventCreate, current_user: User = Depends(get_curr
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="برای ایجاد رویداد باید وارد شوید"
-            )
-        
-        # بررسی کد ملی کاربر
-        if not current_user.national_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="برای ایجاد رویداد، ابتدا کد ملی خود را ثبت کنید"
             )
         
         if not all([event.title, event.time, event.location]):
@@ -1329,6 +1140,8 @@ async def create_event(event: EventCreate, current_user: User = Depends(get_curr
             creator=created_events[0].creator,
             created_at=created_events[0].created_at,
             type=created_events[0].type,
+            category=created_events[0].category,
+            subcategory=created_events[0].subcategory,
             city=created_events[0].city,
             province=created_events[0].province,
             country=created_events[0].country,
@@ -1365,8 +1178,7 @@ async def get_user_by_email(email: str, db: Session = Depends(get_db)):
             "first_name": user.first_name,
             "last_name": user.last_name,
             "phone_number": user.phone_number,
-            "national_id": user.national_id,
-            "has_national_id": user.national_id is not None
+            "has_national_id": False  # همیشه false چون کد ملی حذف شده
         }
     except Exception as e:
         logger.error(f"خطا در دریافت اطلاعات کاربر: {e}")
@@ -1378,9 +1190,7 @@ async def get_user_by_email(email: str, db: Session = Depends(get_db)):
 # 🎯 API برای پرداخت نذورات
 @app.post("/donations/make-donation")
 async def make_donation(
-    donation_type: str = Query(...),
-    amount: float = Query(...),
-    payment_method: str = Query(...),
+    donation_data: DonationCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1401,7 +1211,7 @@ async def make_donation(
         notification = Notification(
             user_id=current_user.id,
             title="درخواست پرداخت نذری",
-            message=f"برای پرداخت {amount} تومان نذری {donation_type}، مبلغ را به شماره کارت {card_number} واریز کنید.",
+            message=f"برای پرداخت {donation_data.amount} تومان نذری {donation_data.donation_type}، مبلغ را به شماره کارت {card_number} واریز کنید.",
             type="donation"
         )
         db.add(notification)
@@ -1410,8 +1220,8 @@ async def make_donation(
         return {
             "message": "برای پرداخت نذری، مبلغ را به شماره کارت زیر واریز کنید",
             "card_number": card_number,
-            "amount": amount,
-            "donation_type": donation_type,
+            "amount": donation_data.amount,
+            "donation_type": donation_data.donation_type,
             "note": "پس از واریز، رسید پرداخت را برای ما ارسال کنید."
         }
         
@@ -1510,6 +1320,84 @@ async def get_terms_and_privacy():
         }
     }
 
+# API جدید برای دریافت دسته‌بندی‌ها
+@app.get("/categories", response_model=Dict[str, List[str]])
+async def get_categories():
+    """
+    دریافت لیست دسته‌بندی‌های اصلی و زیردسته‌ها
+    """
+    categories = {
+        "🇮🇷 ملی": [
+            "مراسم دولتی",
+            "بزرگداشت شهدا",
+            "یادبود شخصیت‌های ملی",
+            "افتتاح پروژه",
+            "اختتامیه رسمی",
+            "مراسم تقدیر",
+            "مراسم استقبال",
+            "مراسم بدرقه",
+            "مراسم مناسبتی کشوری"
+        ],
+        "🕌 مذهبی": [
+            "محرم",
+            "صفر",
+            "شب قدر",
+            "افطاری",
+            "عید فطر",
+            "عید قربان",
+            "عید غدیر",
+            "نذری",
+            "دعای کمیل",
+            "دعای توسل",
+            "دعای ندبه",
+            "جلسه قرآن",
+            "ختم قرآن",
+            "مولودی",
+            "روضه",
+            "هیئت",
+            "اعتکاف",
+            "اربعین",
+            "پیاده‌روی مذهبی"
+        ],
+        "👨‍👩‍👧‍👦 شخصی": [
+            "عروسی",
+            "نامزدی",
+            "عقد",
+            "تولد",
+            "جشن دندونی",
+            "ولیمه",
+            "سالگرد ازدواج",
+            "مهمانی خانوادگی",
+            "دورهمی دوستانه",
+            "جشن فارغ‌التحصیلی",
+            "مراسم خداحافظی",
+            "سورپرایز",
+            "جشن موفقیت",
+            "پارتی خصوصی"
+        ],
+        "🎭 فرهنگی و اجتماعی": [
+            "سمینار",
+            "همایش",
+            "کنفرانس",
+            "کارگاه آموزشی",
+            "نشست فرهنگی",
+            "جلسه کتاب‌خوانی",
+            "اکران فیلم",
+            "نمایش تئاتر",
+            "جشنواره",
+            "نمایشگاه",
+            "مراسم هنری",
+            "رویداد دانشجویی",
+            "رویداد استارتاپی",
+            "گردهمایی اجتماعی",
+            "نشست تخصصی",
+            "پنل گفتگو",
+            "جلسه نقد و بررسی"
+        ]
+    }
+    
+    return categories
+
 # تابع ایجاد رویدادهای تکراری
 def generate_recurring_events(base_event: EventCreate, db: Session) -> List[Event]:
     events = []
@@ -1524,6 +1412,8 @@ def generate_recurring_events(base_event: EventCreate, db: Session) -> List[Even
             host=base_event.host,
             creator=base_event.creator,
             type=base_event.type,
+            category=base_event.category,
+            subcategory=base_event.subcategory,
             city=base_event.city,
             province=base_event.province,
             country=base_event.country,
@@ -1550,6 +1440,8 @@ def generate_recurring_events(base_event: EventCreate, db: Session) -> List[Even
         host=base_event.host,
         creator=base_event.creator,
         type=base_event.type,
+        category=base_event.category,
+        subcategory=base_event.subcategory,
         city=base_event.city,
         province=base_event.province,
         country=base_event.country,
@@ -1606,6 +1498,8 @@ def generate_recurring_events(base_event: EventCreate, db: Session) -> List[Even
             host=base_event.host,
             creator=base_event.creator,
             type=base_event.type,
+            category=base_event.category,
+            subcategory=base_event.subcategory,
             city=base_event.city,
             province=base_event.province,
             country=base_event.country,
@@ -1626,7 +1520,7 @@ def generate_recurring_events(base_event: EventCreate, db: Session) -> List[Even
 async def get_events(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         logger.info(f"دریافت درخواست لیست رویدادها از کاربر: {current_user.email if current_user else 'Anonymous'}")
-        events = db.query(Event).all()
+        events = db.query(Event).filter(Event.active == 1).all()
         
         events_list = []
         for event in events:
@@ -1639,12 +1533,21 @@ async def get_events(current_user: User = Depends(get_current_user), db: Session
             
             # بررسی آیا رویداد مورد علاقه کاربر است
             is_favorite = False
+            # بررسی آیا کاربر در رویداد ثبت‌نام کرده است
+            is_registered = False
+            
             if current_user:
                 favorite = db.query(UserFavorite).filter(
                     UserFavorite.user_id == current_user.id,
                     UserFavorite.event_id == event.id
                 ).first()
                 is_favorite = favorite is not None
+                
+                registration = db.query(EventParticipant).filter(
+                    EventParticipant.event_id == event.id,
+                    EventParticipant.user_id == current_user.id
+                ).first()
+                is_registered = registration is not None
             
             event_dict = {
                 "id": event.id,
@@ -1657,6 +1560,8 @@ async def get_events(current_user: User = Depends(get_current_user), db: Session
                 "creator": event.creator,
                 "created_at": event.created_at,
                 "type": getattr(event, 'type', 'religious'),
+                "category": getattr(event, 'category', 'مذهبی'),
+                "subcategory": getattr(event, 'subcategory', ''),
                 "city": getattr(event, 'city', 'تهران'),
                 "province": getattr(event, 'province', 'تهران'),
                 "country": getattr(event, 'country', 'iran'),
@@ -1667,7 +1572,8 @@ async def get_events(current_user: User = Depends(get_current_user), db: Session
                 "average_rating": average_rating,
                 "comment_count": comment_count,
                 "current_participants": current_participants,
-                "is_favorite": is_favorite
+                "is_favorite": is_favorite,
+                "is_registered": is_registered
             }
             events_list.append(event_dict)
         
@@ -1688,7 +1594,7 @@ async def get_events_optimized(
     """Endpoint جدید برای دریافت بهینه‌شده رویدادها"""
     try:
         logger.info("دریافت درخواست لیست رویدادهای بهینه‌شده")
-        events = db.query(Event).all()
+        events = db.query(Event).filter(Event.active == 1).all()
         
         events_list = []
         for event in events:
@@ -1701,12 +1607,21 @@ async def get_events_optimized(
             
             # بررسی آیا رویداد مورد علاقه کاربر است
             is_favorite = False
+            # بررسی آیا کاربر در رویداد ثبت‌نام کرده است
+            is_registered = False
+            
             if current_user:
                 favorite = db.query(UserFavorite).filter(
                     UserFavorite.user_id == current_user.id,
                     UserFavorite.event_id == event.id
                 ).first()
                 is_favorite = favorite is not None
+                
+                registration = db.query(EventParticipant).filter(
+                    EventParticipant.event_id == event.id,
+                    EventParticipant.user_id == current_user.id
+                ).first()
+                is_registered = registration is not None
             
             event_dict = {
                 "id": event.id,
@@ -1719,6 +1634,8 @@ async def get_events_optimized(
                 "creator": event.creator,
                 "created_at": event.created_at,
                 "type": getattr(event, 'type', 'religious'),
+                "category": getattr(event, 'category', 'مذهبی'),
+                "subcategory": getattr(event, 'subcategory', ''),
                 "city": getattr(event, 'city', 'تهران'),
                 "province": getattr(event, 'province', 'تهران'),
                 "country": getattr(event, 'country', 'iran'),
@@ -1729,7 +1646,8 @@ async def get_events_optimized(
                 "average_rating": average_rating,
                 "comment_count": comment_count,
                 "current_participants": current_participants,
-                "is_favorite": is_favorite
+                "is_favorite": is_favorite,
+                "is_registered": is_registered
             }
             events_list.append(event_dict)
         
@@ -1746,7 +1664,7 @@ async def get_events_optimized(
 async def get_public_events(db: Session = Depends(get_db)):
     try:
         logger.info("دریافت درخواست لیست رویدادهای عمومی")
-        events = db.query(Event).all()
+        events = db.query(Event).filter(Event.active == 1).all()
         
         events_list = []
         for event in events:
@@ -1768,6 +1686,8 @@ async def get_public_events(db: Session = Depends(get_db)):
                 "creator": event.creator,
                 "created_at": event.created_at,
                 "type": getattr(event, 'type', 'religious'),
+                "category": getattr(event, 'category', 'مذهبی'),
+                "subcategory": getattr(event, 'subcategory', ''),
                 "city": getattr(event, 'city', 'تهران'),
                 "province": getattr(event, 'province', 'تهران'),
                 "country": getattr(event, 'country', 'iran'),
@@ -1778,7 +1698,8 @@ async def get_public_events(db: Session = Depends(get_db)):
                 "average_rating": average_rating,
                 "comment_count": comment_count,
                 "current_participants": current_participants,
-                "is_favorite": False
+                "is_favorite": False,
+                "is_registered": False
             }
             events_list.append(event_dict)
         
@@ -1804,6 +1725,10 @@ async def update_event_fields(event_id: int, db: Session = Depends(get_db)):
         
         if not hasattr(db_event, 'type') or not db_event.type:
             db_event.type = "religious"
+        if not hasattr(db_event, 'category') or not db_event.category:
+            db_event.category = "مذهبی"
+        if not hasattr(db_event, 'subcategory') or not db_event.subcategory:
+            db_event.subcategory = ""
         if not hasattr(db_event, 'city') or not db_event.city:
             db_event.city = creator_user.city if creator_user else "تهران"
         if not hasattr(db_event, 'province') or not db_event.province:
@@ -1960,16 +1885,14 @@ async def check_auth(current_user: User = Depends(get_current_user)):
             "authenticated": True,
             "user_id": current_user.id,
             "email": current_user.email,
-            "name": f"{current_user.first_name} {current_user.last_name}",
-            "has_national_id": current_user.national_id is not None
+            "name": f"{current_user.first_name} {current_user.last_name}"
         }
     else:
         return {
             "authenticated": False,
             "user_id": None,
             "email": None,
-            "name": None,
-            "has_national_id": False
+            "name": None
         }
 
 @app.post("/comments", response_model=CommentResponse)
@@ -2165,6 +2088,8 @@ async def get_user_registered_events(user_id: int, current_user: User = Depends(
                 "creator": event.creator,
                 "created_at": event.created_at,
                 "type": getattr(event, 'type', 'religious'),
+                "category": getattr(event, 'category', 'مذهبی'),
+                "subcategory": getattr(event, 'subcategory', ''),
                 "city": getattr(event, 'city', 'تهران'),
                 "province": getattr(event, 'province', 'تهران'),
                 "country": getattr(event, 'country', 'iran'),
@@ -2210,8 +2135,7 @@ async def get_event_participants(event_id: int, db: Session = Depends(get_db)):
                 user_id=participant.user_id,
                 registered_at=participant.registered_at,
                 attended=participant.attended,
-                user_name=f"{user.first_name} {user.last_name}" if user else "کاربر ناشناس",
-                national_id_used=participant.national_id_used
+                user_name=f"{user.first_name} {user.last_name}" if user else "کاربر ناشناس"
             )
             participants_with_names.append(participant_response)
         
@@ -2257,6 +2181,8 @@ async def get_user_events(user_id: int, db: Session = Depends(get_db)):
                 "creator": event.creator,
                 "created_at": event.created_at,
                 "type": getattr(event, 'type', 'religious'),
+                "category": getattr(event, 'category', 'مذهبی'),
+                "subcategory": getattr(event, 'subcategory', ''),
                 "city": getattr(event, 'city', 'تهران'),
                 "province": getattr(event, 'province', 'تهران'),
                 "country": getattr(event, 'country', 'iran'),
@@ -2491,6 +2417,9 @@ async def get_user_favorites(user_id: int, db: Session = Depends(get_db)):
             
             current_participants = db.query(EventParticipant).filter(EventParticipant.event_id == event.id).count()
             
+            # بررسی آیا رویداد مورد علاقه کاربر است
+            is_favorite = True
+            
             event_dict = {
                 "id": event.id,
                 "title": event.title,
@@ -2502,6 +2431,8 @@ async def get_user_favorites(user_id: int, db: Session = Depends(get_db)):
                 "creator": event.creator,
                 "created_at": event.created_at,
                 "type": getattr(event, 'type', 'religious'),
+                "category": getattr(event, 'category', 'مذهبی'),
+                "subcategory": getattr(event, 'subcategory', ''),
                 "city": getattr(event, 'city', 'تهران'),
                 "province": getattr(event, 'province', 'تهران'),
                 "country": getattr(event, 'country', 'iran'),
@@ -2512,7 +2443,8 @@ async def get_user_favorites(user_id: int, db: Session = Depends(get_db)):
                 "average_rating": average_rating,
                 "comment_count": comment_count,
                 "current_participants": current_participants,
-                "is_favorite": True
+                "is_favorite": is_favorite,
+                "is_registered": False
             }
             events_list.append(event_dict)
         
@@ -2591,6 +2523,8 @@ async def test_db(db: Session = Depends(get_db)):
                 "id": event.id,
                 "title": event.title,
                 "type": getattr(event, 'type', 'N/A'),
+                "category": getattr(event, 'category', 'مذهبی'),
+                "subcategory": getattr(event, 'subcategory', ''),
                 "city": getattr(event, 'city', 'N/A'),
                 "province": getattr(event, 'province', 'N/A'),
                 "country": getattr(event, 'country', 'N/A'),
@@ -2622,8 +2556,7 @@ async def health_check():
 # 🎯 اضافه کردن endpoint برای پرداخت نذورات (ورژن ساده)
 @app.post("/donations/pay")
 async def pay_donation(
-    donation_type: str = Query(...),
-    amount: float = Query(...),
+    donation_data: DonationCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -2641,7 +2574,7 @@ async def pay_donation(
         notification = Notification(
             user_id=current_user.id,
             title="درخواست پرداخت نذری",
-            message=f"برای پرداخت {amount:,} تومان نذری {donation_type}، لطفاً مبلغ را به شماره کارت {card_number} واریز کنید.",
+            message=f"برای پرداخت {donation_data.amount:,} تومان نذری {donation_data.donation_type}، لطفاً مبلغ را به شماره کارت {card_number} واریز کنید.",
             type="donation"
         )
         db.add(notification)
@@ -2651,8 +2584,8 @@ async def pay_donation(
             "success": True,
             "message": "برای پرداخت نذری، مبلغ را به شماره کارت زیر واریز کنید",
             "card_number": card_number,
-            "amount": amount,
-            "donation_type": donation_type,
+            "amount": donation_data.amount,
+            "donation_type": donation_data.donation_type,
             "note": "پس از واریز، رسید پرداخت را برای ما ارسال کنید."
         }
         
@@ -2698,6 +2631,8 @@ async def startup_event():
                 host="امام جماعت",
                 creator=test_user.id,
                 type="religious",
+                category="مذهبی",
+                subcategory="روضه",
                 city="تهران",
                 province="تهران",
                 country="iran",
@@ -2718,6 +2653,10 @@ async def startup_event():
             
             if not hasattr(event, 'type') or not event.type:
                 event.type = "religious"
+                needs_update = True
+            
+            if not hasattr(event, 'category') or not event.category:
+                event.category = "مذهبی"
                 needs_update = True
                 
             if not hasattr(event, 'city') or not event.city:
