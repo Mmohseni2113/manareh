@@ -3465,150 +3465,226 @@
             </div>
         </div>
     </div>
-
-    <!-- صفحه ثبت رویداد جدید -->
-    <div id="addEventPage" class="page-section">
-        <div class="wrap">
-            <div class="add-event-form">
-                <h2>ثبت رویداد جدید</h2>
-                <form id="newEventForm">
-                    <div class="event-form-section">
-                        <h3>اطلاعات اصلی</h3>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="eventTitle">عنوان رویداد *</label>
-                                <input type="text" id="eventTitle" placeholder="عنوان رویداد" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="eventOrganizer">برگزارکننده *</label>
-                                <input type="text" id="eventOrganizer" placeholder="نام برگزارکننده" required>
-                            </div>
-                        </div>
-                        
+<!-- صفحه ثبت رویداد جدید -->
+<div id="addEventPage" class="page-section">
+    <div class="wrap">
+        <div class="add-event-form">
+            <h2>ثبت رویداد جدید</h2>
+            <form id="newEventForm">
+                <div class="event-form-section">
+                    <h3>اطلاعات اصلی</h3>
+                    <div class="form-row">
                         <div class="form-group">
-                            <label for="eventDescription">توضیحات</label>
-                            <textarea id="eventDescription" placeholder="توضیحات اضافی درباره رویداد" rows="3"></textarea>
+                            <label for="eventTitle">عنوان رویداد *</label>
+                            <input type="text" id="eventTitle" placeholder="عنوان رویداد" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="eventOrganizer">برگزارکننده *</label>
+                            <input type="text" id="eventOrganizer" placeholder="نام برگزارکننده" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="eventDescription">توضیحات</label>
+                        <textarea id="eventDescription" placeholder="توضیحات اضافی درباره رویداد" rows="3"></textarea>
+                    </div>
+                </div>
+
+                <div class="event-form-section">
+                    <h3>دسته‌بندی</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="eventType">نوع رویداد *</label>
+                            <select id="eventType" required>
+                                <option value="">انتخاب نوع</option>
+                                <option value="national">🇮🇷 ملی</option>
+                                <option value="religious">🕌 مذهبی</option>
+                                <option value="personal">👨‍👩‍👧‍👦 شخصی</option>
+                                <option value="cultural">🎭 فرهنگی و اجتماعی</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="eventCategory">دسته‌بندی اصلی *</label>
+                            <select id="eventCategory" required>
+                                <option value="">ابتدا نوع رویداد را انتخاب کنید</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="event-form-section">
+                    <h3>زمان و مکان</h3>
+                    <div class="form-group">
+                        <label for="eventDateTime">تاریخ و زمان *</label>
+                        <div class="date-time-picker">
+                            <div class="date-input-container">
+                                <i class="fas fa-calendar"></i>
+                                <input type="text" id="eventDate" class="persian-date-input" placeholder="انتخاب تاریخ" required readonly>
+                            </div>
+                            <div class="time-input-container">
+                                <input type="number" id="eventHour" class="time-input" placeholder="ساعت" min="0" max="23" required>
+                                <span>:</span>
+                                <input type="number" id="eventMinute" class="time-input" placeholder="دقیقه" min="0" max="59" required>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="event-form-section">
-                        <h3>دسته‌بندی</h3>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="eventType">نوع رویداد *</label>
-                                <select id="eventType" required>
-                                    <option value="">انتخاب نوع</option>
-                                    <option value="national">🇮🇷 ملی</option>
-                                    <option value="religious">🕌 مذهبی</option>
-                                    <option value="personal">👨‍👩‍👧‍👦 شخصی</option>
-                                    <option value="cultural">🎭 فرهنگی و اجتماعی</option>
-                                </select>
+                    <div class="form-group">
+                        <label>موقعیت روی نقشه *</label>
+                        <div class="map-container">
+                            <div id="add-event-map"></div>
+                            <div class="map-loading" id="mapLoading" style="display: none;">
+                                <p>در حال بارگذاری نقشه...</p>
                             </div>
-                            <div class="form-group">
-                                <label for="eventCategory">دسته‌بندی اصلی *</label>
-                                <select id="eventCategory" required>
-                                    <option value="">ابتدا نوع رویداد را انتخاب کنید</option>
-                                </select>
-                            </div>
+                        </div>
+                        <div class="muted" style="margin-top: 0.5rem;">
+                            مختصات: <span id="eventCoordinates">35.6892, 51.3890</span>
+                            (برای انتخاب موقعیت، روی نقشه کلیک کنید)
                         </div>
                     </div>
 
-                    <div class="event-form-section">
-                        <h3>زمان و مکان</h3>
+                    <div class="form-group">
+                        <label for="eventAddress">آدرس دقیق *</label>
+                        <textarea id="eventAddress" placeholder="آدرس کامل محل برگزاری" required rows="2"></textarea>
+                    </div>
+
+                    <div class="form-row">
                         <div class="form-group">
-                            <label for="eventDateTime">تاریخ و زمان *</label>
-                            <div class="date-time-picker">
-                                <div class="date-input-container">
-                                    <i class="fas fa-calendar"></i>
-                                    <input type="text" id="eventDate" class="persian-date-input" placeholder="انتخاب تاریخ" required readonly>
+                            <label for="eventCountry">کشور</label>
+                            <select id="eventCountry">
+                                <option value="iran" selected>ایران</option>
+                                <option value="other">سایر کشورها</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="eventCity">شهر *</label>
+                            <input type="text" id="eventCity" placeholder="شهر" value="تهران" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- بخش جدید: تکرار رویداد -->
+                <div class="event-form-section">
+                    <h3>تکرار رویداد</h3>
+                    <div class="form-group">
+                        <label>تکرار رویداد</label>
+                        <div class="repeat-options">
+                            <div class="repeat-option">
+                                <input type="radio" id="repeatNone" name="repeatType" value="none" checked>
+                                <label for="repeatNone">بدون تکرار</label>
+                            </div>
+                            <div class="repeat-option">
+                                <input type="radio" id="repeatDaily" name="repeatType" value="daily">
+                                <label for="repeatDaily">روزانه</label>
+                            </div>
+                            <div class="repeat-option">
+                                <input type="radio" id="repeatWeekly" name="repeatType" value="weekly">
+                                <label for="repeatWeekly">هفتگی</label>
+                            </div>
+                            <div class="repeat-option">
+                                <input type="radio" id="repeatMonthly" name="repeatType" value="monthly">
+                                <label for="repeatMonthly">ماهانه</label>
+                            </div>
+                            
+                            <!-- جزئیات تکرار هفتگی -->
+                            <div id="weeklyDetails" class="repeat-details" style="display: none; margin-top: 1rem;">
+                                <div style="margin-bottom: 0.5rem; font-weight: 500;">روزهای هفته:</div>
+                                <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
+                                    <label><input type="checkbox" name="repeatDays" value="0"> شنبه</label>
+                                    <label><input type="checkbox" name="repeatDays" value="1"> یکشنبه</label>
+                                    <label><input type="checkbox" name="repeatDays" value="2"> دوشنبه</label>
+                                    <label><input type="checkbox" name="repeatDays" value="3"> سه‌شنبه</label>
+                                    <label><input type="checkbox" name="repeatDays" value="4"> چهارشنبه</label>
+                                    <label><input type="checkbox" name="repeatDays" value="5"> پنجشنبه</label>
+                                    <label><input type="checkbox" name="repeatDays" value="6"> جمعه</label>
                                 </div>
-                                <div class="time-input-container">
-                                    <input type="number" id="eventHour" class="time-input" placeholder="ساعت" min="0" max="23" required>
-                                    <span>:</span>
-                                    <input type="number" id="eventMinute" class="time-input" placeholder="دقیقه" min="0" max="59" required>
+                            </div>
+                            
+                            <!-- جزئیات تکرار ماهانه -->
+                            <div id="monthlyDetails" class="repeat-details" style="display: none; margin-top: 1rem;">
+                                <label for="monthlyDay">روز ماه:</label>
+                                <select id="monthlyDay" style="margin-right: 0.5rem; width: 80px;">
+                                    <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                                    <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+                                    <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+                                    <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+                                    <option value="13">13</option><option value="14">14</option><option value="15">15</option>
+                                    <option value="16">16</option><option value="17">17</option><option value="18">18</option>
+                                    <option value="19">19</option><option value="20">20</option><option value="21">21</option>
+                                    <option value="22">22</option><option value="23">23</option><option value="24">24</option>
+                                    <option value="25">25</option><option value="26">26</option><option value="27">27</option>
+                                    <option value="28">28</option><option value="29">29</option><option value="30">30</option>
+                                    <option value="31">31</option>
+                                </select>
+                            </div>
+                            
+                            <!-- تنظیمات پایان تکرار -->
+                            <div id="repeatEndSection" style="margin-top: 1.2rem; display: none;">
+                                <label style="font-weight: 500;">پایان تکرار:</label>
+                                <div style="display: flex; flex-direction: column; gap: 0.8rem; margin-top: 0.5rem;">
+                                    <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <input type="radio" name="repeatEnd" value="never" checked> بدون پایان
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <input type="radio" name="repeatEnd" value="date"> تا تاریخ
+                                        <input type="text" id="repeatEndDate" class="persian-date-input" placeholder="انتخاب تاریخ" style="width: 140px;" readonly>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <input type="radio" name="repeatEnd" value="occurrences"> پس از
+                                        <input type="number" id="repeatOccurrences" min="2" max="365" value="10" style="width: 70px;">
+                                        بار
+                                    </label>
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
 
+                <div class="event-form-section">
+                    <h3>تنظیمات اضافی</h3>
+                    <div class="form-row">
                         <div class="form-group">
-                            <label>موقعیت روی نقشه *</label>
-                            <div class="map-container">
-                                <div id="add-event-map"></div>
-                                <div class="map-loading" id="mapLoading" style="display: none;">
-                                    <p>در حال بارگذاری نقشه...</p>
-                                </div>
-                            </div>
-                            <div class="muted" style="margin-top: 0.5rem;">
-                                مختصات: <span id="eventCoordinates">35.6892, 51.3890</span>
-                                (برای انتخاب موقعیت، روی نقشه کلیک کنید)
-                            </div>
+                            <label for="eventCapacity">ظرفیت مراسم *</label>
+                            <input type="number" id="eventCapacity" placeholder="۱۰۰" min="1" value="100" required>
                         </div>
-
                         <div class="form-group">
-                            <label for="eventAddress">آدرس دقیق *</label>
-                            <textarea id="eventAddress" placeholder="آدرس کامل محل برگزاری" required rows="2"></textarea>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="eventCountry">کشور</label>
-                                <select id="eventCountry">
-                                    <option value="iran" selected>ایران</option>
-                                    <option value="other">سایر کشورها</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="eventCity">شهر *</label>
-                                <input type="text" id="eventCity" placeholder="شهر" value="تهران" required>
-                            </div>
+                            <label for="eventIsFree">نوع رویداد</label>
+                            <select id="eventIsFree">
+                                <option value="true" selected>رایگان</option>
+                                <option value="false">پولی</option>
+                            </select>
                         </div>
                     </div>
-
-                    <div class="event-form-section">
-                        <h3>تنظیمات اضافی</h3>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="eventCapacity">ظرفیت مراسم *</label>
-                                <input type="number" id="eventCapacity" placeholder="۱۰۰" min="1" value="100" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="eventIsFree">نوع رویداد</label>
-                                <select id="eventIsFree">
-                                    <option value="true" selected>رایگان</option>
-                                    <option value="false">پولی</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group" id="priceField" style="display: none;">
-                            <label for="eventPrice">مبلغ (تومان)</label>
-                            <input type="number" id="eventPrice" placeholder="مبلغ" min="0" value="0">
-                        </div>
+                    
+                    <div class="form-group" id="priceField" style="display: none;">
+                        <label for="eventPrice">مبلغ (تومان)</label>
+                        <input type="number" id="eventPrice" placeholder="مبلغ" min="0" value="0">
                     </div>
+                </div>
 
-                    <div class="button-group" style="margin-top: 1.5rem;">
-                        <button type="button" class="btn primary" id="submitEventBtn">ثبت رویداد</button>
-                        <button type="button" class="btn ghost" onclick="navigateTo('eventsMainPage')">بازگشت</button>
-                    </div>
-                </form>
-            </div>
+                <div class="button-group" style="margin-top: 1.5rem;">
+                    <button type="button" class="btn primary" id="submitEventBtn">ثبت رویداد</button>
+                    <button type="button" class="btn ghost" onclick="navigateTo('eventsMainPage')">بازگشت</button>
+                </div>
+            </form>
         </div>
     </div>
+</div>
 
-    <div id="modal" class="modal">
-        <div class="modal-content">
-            <h3 id="modalTitle"></h3>
-            <p id="modalMessage"></p>
-            <button class="glass-button primary" onclick="hideModal()">بستن</button>
-        </div>
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <h3 id="modalTitle"></h3>
+        <p id="modalMessage"></p>
+        <button class="glass-button primary" onclick="hideModal()">بستن</button>
     </div>
+</div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://unpkg.com/persian-date@1.1.0/dist/persian-date.min.js"></script>
-    <script src="https://unpkg.com/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js"></script>
-    
-    <script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://unpkg.com/persian-date@1.1.0/dist/persian-date.min.js"></script>
+<script src="https://unpkg.com/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js"></script>
+
+<script>
         // کانفیگ اولیه
         const API_BASE_URL = "https://manareh.onrender.com";
         
