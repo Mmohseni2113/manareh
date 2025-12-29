@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://unpkg.com/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css">
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <style>
+        /* استایل‌های قبلی بدون تغییر باقی می‌مانند */
         * {
             margin: 0;
             padding: 0;
@@ -533,11 +534,22 @@
             padding: 0 1rem;
         }
     
+        /* اصلاح برای کارت‌های ویژگی‌ها در موبایل */
         .features-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 1rem;
             padding: 0 1rem;
+        }
+    
+        @media (max-width: 480px) {
+            .features-grid {
+                grid-template-columns: 1fr; /* در موبایل یک ستونه */
+            }
+            
+            .feature-card {
+                margin-bottom: 1rem;
+            }
         }
     
         .feature-card {
@@ -1089,6 +1101,7 @@
             font-size: 0.9rem;
         }
 
+        /* بهبود فیلترها برای موبایل */
         .filters {
             background: var(--card-bg);
             border-radius: var(--radius);
@@ -1100,6 +1113,14 @@
             margin: 1rem 0;
             border: 1px solid var(--glass-border);
             backdrop-filter: blur(0.375rem) saturate(120%);
+        }
+
+        .filters label {
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 0.85rem;
+            margin-bottom: 0.3rem;
+            display: block;
         }
 
         .filters select, .filters .btn {
@@ -1763,47 +1784,9 @@
             color: var(--accent-2);
         }
 
-        .donation-amounts {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            justify-content: center;
-            margin: 1rem 0;
-        }
-
-        .amount-btn {
-            padding: 0.6rem 1rem;
-            border: 1px solid #e5e7eb;
-            border-radius: 1.5rem;
-            background: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 0.8rem;
-        }
-
-        .amount-btn:hover {
-            border-color: var(--accent-2);
-        }
-
-        .amount-btn.selected {
-            background: var(--accent-2);
-            color: white;
-            border-color: var(--accent-2);
-        }
-
-        .custom-amount {
-            display: flex;
-            gap: 0.5rem;
-            margin: 1rem 0;
-            flex-direction: column;
-        }
-
-        .custom-amount input {
-            flex: 1;
-            padding: 0.8rem;
-            border-radius: 0.5rem;
-            border: 1px solid #e5e7eb;
-            font-size: 1rem;
+        /* حذف بخش مبلغ کمک از نذورات */
+        .donation-amount-section {
+            display: none; /* مخفی کردن این بخش */
         }
 
         .card-number-display {
@@ -2348,6 +2331,162 @@
             border-color: var(--accent-2);
         }
 
+        /* استایل‌های جدید برای تقویم */
+        .calendar-page {
+            position: fixed;
+            top: 60px;
+            left: 0;
+            width: 100%;
+            height: calc(100% - 60px);
+            background: white;
+            z-index: 1000;
+            display: none;
+            overflow-y: auto;
+            text-align: right;
+            padding: 1rem;
+        }
+
+        .calendar-container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: linear-gradient(to right, var(--accent-2), var(--accent-1));
+            color: white;
+            border-radius: 10px;
+        }
+
+        .calendar-header button {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+
+        .calendar-header button:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .calendar-weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        .calendar-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            text-align: center;
+        }
+
+        .calendar-day {
+            height: 45px;
+            border-radius: 10px;
+            background: #f3f4f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .calendar-day:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .calendar-day.today {
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+            color: white;
+            font-weight: 600;
+        }
+
+        .calendar-day.holiday {
+            color: #d32f2f;
+            background: #ffecec;
+            font-weight: 600;
+            border: 2px solid #ffcdd2;
+        }
+
+        .calendar-day.selected {
+            outline: 3px solid var(--accent-1);
+            transform: scale(1.05);
+        }
+
+        .calendar-occasion-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 12px;
+            font-size: 14px;
+            border-right: 4px solid var(--accent-2);
+        }
+
+        .calendar-occasion-title {
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .calendar-occasion-item {
+            padding: 8px 0;
+            border-bottom: 1px dashed #e5e7eb;
+        }
+
+        .calendar-occasion-item:last-child {
+            border-bottom: none;
+        }
+
+        .no-occasion {
+            text-align: center;
+            color: #94a3b8;
+            padding: 20px;
+            font-style: italic;
+        }
+
+        .calendar-month-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        /* بهبود کارت‌های ثبت‌نام در دسکتاپ */
+        @media (min-width: 768px) {
+            .event-actions {
+                flex-direction: row;
+            }
+            
+            .event-action-btn {
+                min-width: 140px;
+                padding: 0.7rem 1rem;
+                font-size: 0.85rem;
+            }
+        }
+
         /* Media Queries */
         @media (min-width: 768px) {
             section {
@@ -2401,11 +2540,17 @@
             .filters {
                 flex-direction: row;
                 align-items: center;
+                flex-wrap: wrap;
             }
             
             .filters select {
                 width: auto;
                 min-width: 120px;
+                flex: 1;
+            }
+            
+            .filters label {
+                margin-bottom: 0.5rem;
             }
             
             .main {
@@ -2439,6 +2584,10 @@
             .category-filters {
                 grid-template-columns: repeat(4, 1fr);
             }
+            
+            .calendar-container {
+                max-width: 600px;
+            }
         }
 
         @media (min-width: 992px) {
@@ -2452,6 +2601,12 @@
             
             .features-grid {
                 grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .event-action-btn {
+                min-width: 150px;
+                padding: 0.8rem 1.2rem;
+                font-size: 0.9rem;
             }
         }
 
@@ -2509,6 +2664,19 @@
             .category-filters {
                 grid-template-columns: repeat(2, 1fr);
             }
+            
+            .calendar-day {
+                height: 40px;
+                font-size: 14px;
+            }
+            
+            .calendar-header {
+                padding: 8px;
+            }
+            
+            .calendar-month-title {
+                font-size: 16px;
+            }
         }
 
         @media (max-width: 480px) {
@@ -2559,6 +2727,11 @@
             .feature-card p {
                 font-size: 0.8rem;
             }
+            
+            .calendar-day {
+                height: 35px;
+                font-size: 12px;
+            }
         }
 
         @media (max-width: 360px) {
@@ -2578,6 +2751,11 @@
             
             .terms-modal-content {
                 padding: 1rem;
+            }
+            
+            .calendar-day {
+                height: 30px;
+                font-size: 11px;
             }
         }
 
@@ -2754,7 +2932,7 @@
                         <li><a href="#features" class="nav-link">ویژگی‌ها</a></li>
                         <li><a href="#map-section" class="nav-link">مراسم‌ها</a></li>
                         <li><a href="#" class="digital-library-btn nav-link">کتابخانه دیجیتال</a></li>
-                        <li><a href="#" class="calendar-btn nav-link">تقویم</a></li>
+                        <li><a href="#" class="open-calendar-btn nav-link">تقویم</a></li>
                         <li><a href="#donations-section" class="nav-link">نذورات</a></li>
                         <li><a href="#contact" class="nav-link">تماس با ما</a></li>
                     </ul>
@@ -2770,7 +2948,7 @@
                     <li><a href="#features" class="nav-link">ویژگی‌ها</a></li>
                     <li><a href="#map-section" class="nav-link">مراسم‌ها</a></li>
                     <li><a href="#" class="digital-library-btn nav-link">کتابخانه دیجیتال</a></li>
-                    <li><a href="#" class="calendar-btn nav-link">تقویم</a></li>
+                    <li><a href="#" class="open-calendar-btn nav-link">تقویم</a></li>
                     <li><a href="#donations-section" class="nav-link">نذورات</a></li>
                     <li><a href="#contact" class="nav-link">تماس با ما</a></li>
                 </ul>
@@ -2808,6 +2986,41 @@
         </div>
         <div class="notifications-list" id="notificationsList">
             <!-- اطلاع‌رسانی‌ها اینجا نمایش داده می‌شوند -->
+        </div>
+    </div>
+
+    <!-- پنل تقویم -->
+    <div id="calendarPage" class="calendar-page">
+        <div class="calendar-container">
+            <div class="calendar-header">
+                <button onclick="CalendarManager.prevMonth()">‹</button>
+                <div class="calendar-month-title" id="calendarMonthTitle"></div>
+                <button onclick="CalendarManager.nextMonth()">›</button>
+            </div>
+            
+            <div class="calendar-weekdays">
+                <span>ش</span>
+                <span>ی</span>
+                <span>د</span>
+                <span>س</span>
+                <span>چ</span>
+                <span>پ</span>
+                <span>ج</span>
+            </div>
+            
+            <div class="calendar-days" id="calendarDays"></div>
+            
+            <div class="calendar-occasion-box">
+                <div class="calendar-occasion-title">مناسبت‌های روز انتخاب شده:</div>
+                <div id="calendarOccasionList">
+                    <div class="no-occasion">یک روز را انتخاب کنید</div>
+                </div>
+            </div>
+            
+            <a href="javascript:void(0)" onclick="navigateTo('homePage')" class="back-button" style="margin-top: 20px; display: inline-block; text-align: center;">
+                <i class="fas fa-arrow-right"></i>
+                بازگشت به سایت
+            </a>
         </div>
     </div>
 
@@ -3022,12 +3235,8 @@
                         <p>همکاری در برگزاری مراسم</p>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="donationAmount">مبلغ کمک (تومان)</label>
-                    <div class="custom-amount">
-                        <input type="number" id="donationAmount" placeholder="مبلغ دلخواه را وارد کنید">
-                        <button class="btn primary" id="setCustomAmount">تأیید مبلغ</button>
-                    </div>
+                <div class="form-group donation-amount-section">
+                    <!-- این بخش حذف شده -->
                 </div>
                 <div class="form-group">
                     <label>روش پرداخت</label>
@@ -3126,7 +3335,7 @@
                             <li><a href="#features" class="nav-link">ویژگی‌ها</a></li>
                             <li><a href="#map-section" class="nav-link">مراسم‌ها</a></li>
                             <li><a href="#" class="digital-library-btn nav-link">کتابخانه دیجیتال</a></li>
-                            <li><a href="#" class="calendar-btn nav-link">تقویم</a></li>
+                            <li><a href="#" class="open-calendar-btn nav-link">تقویم</a></li>
                             <li><a href="#donations-section" class="nav-link">نذورات</a></li>
                             <li><a href="#contact" class="nav-link">تماس با ما</a></li>
                         </ul>
@@ -3344,47 +3553,64 @@
             <!-- فیلترها -->
             <div class="filters" role="region" aria-label="فیلتر رویدادها">
                 <!-- جستجوی پیشرفته -->
-                <div class="search-box">
-                    <input type="text" class="search-input" id="searchInput" placeholder="جستجوی رویدادها...">
-                    <i class="fas fa-search search-icon"></i>
+                <div class="form-group">
+                    <label for="searchInput">جستجوی رویدادها</label>
+                    <div style="position: relative;">
+                        <input type="text" class="search-input" id="searchInput" placeholder="جستجوی رویدادها...">
+                        <i class="fas fa-search" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--muted);"></i>
+                    </div>
                 </div>
 
-                <label for="typeSelect" class="muted">نوع رویداد</label>
-                <select id="typeSelect">
-                    <option value="all">تمام دسته‌ها</option>
-                    <option value="national">🇮🇷 ملی</option>
-                    <option value="religious">🕌 مذهبی</option>
-                    <option value="personal">👨‍👩‍👧‍👦 شخصی</option>
-                    <option value="cultural">🎭 فرهنگی و اجتماعی</option>
-                </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="typeSelect">نوع رویداد</label>
+                        <select id="typeSelect">
+                            <option value="all">تمام دسته‌ها</option>
+                            <option value="national">🇮🇷 ملی</option>
+                            <option value="religious">🕌 مذهبی</option>
+                            <option value="personal">👨‍👩‍👧‍👦 شخصی</option>
+                            <option value="cultural">🎭 فرهنگی و اجتماعی</option>
+                        </select>
+                    </div>
 
-                <label for="categorySelect" class="muted">دسته‌بندی اصلی</label>
-                <select id="categorySelect">
-                    <option value="all">همه دسته‌بندی‌ها</option>
-                </select>
+                    <div class="form-group">
+                        <label for="categorySelect">دسته‌بندی اصلی</label>
+                        <select id="categorySelect">
+                            <option value="all">همه دسته‌بندی‌ها</option>
+                        </select>
+                    </div>
+                </div>
 
-                <label for="countrySelect" class="muted">کشور</label>
-                <select id="countrySelect">
-                    <option value="all">همه کشورها</option>
-                    <option value="iran">ایران</option>
-                    <option value="turkey">ترکیه</option>
-                    <option value="saudi-arabia">عربستان سعودی</option>
-                    <option value="iraq">عراق</option>
-                    <option value="uae">امارات متحده عربی</option>
-                    <option value="qatar">قطر</option>
-                    <option value="kuwait">کویت</option>
-                    <option value="oman">عمان</option>
-                    <option value="lebanon">لبنان</option>
-                    <option value="jordan">اردن</option>
-                    <option value="egypt">مصر</option>
-                    <option value="syria">سوریه</option>
-                </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="countrySelect">کشور</label>
+                        <select id="countrySelect">
+                            <option value="all">همه کشورها</option>
+                            <option value="iran">ایران</option>
+                            <option value="turkey">ترکیه</option>
+                            <option value="saudi-arabia">عربستان سعودی</option>
+                            <option value="iraq">عراق</option>
+                            <option value="uae">امارات متحده عربی</option>
+                            <option value="qatar">قطر</option>
+                            <option value="kuwait">کویت</option>
+                            <option value="oman">عمان</option>
+                            <option value="lebanon">لبنان</option>
+                            <option value="jordan">اردن</option>
+                            <option value="egypt">مصر</option>
+                            <option value="syria">سوریه</option>
+                        </select>
+                    </div>
 
-                <label for="provinceSelect" class="muted">استان</label>
-                <select id="provinceSelect"><option value="all">همه استان‌ها</option></select>
+                    <div class="form-group">
+                        <label for="provinceSelect">استان</label>
+                        <select id="provinceSelect"><option value="all">همه استان‌ها</option></select>
+                    </div>
+                </div>
 
-                <label for="citySelect" class="muted">شهر</label>
-                <select id="citySelect"><option value="all">همه شهرها</option></select>
+                <div class="form-group">
+                    <label for="citySelect">شهر</label>
+                    <select id="citySelect"><option value="all">همه شهرها</option></select>
+                </div>
 
                 <div class="controls-row">
                     <button class="btn primary" id="addEventBtn">ثبت رویداد جدید</button>
@@ -3683,6 +3909,7 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://unpkg.com/persian-date@1.1.0/dist/persian-date.min.js"></script>
 <script src="https://unpkg.com/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jalaali-js/dist/jalaali.min.js"></script>
 
 <script>
         // کانفیگ اولیه
@@ -3789,13 +4016,133 @@
             return headers;
         }
 
+        // مدیریت تقویم
+        const CalendarManager = {
+            currentYear: null,
+            currentMonth: null,
+            occasions: {},
+            
+            init() {
+                this.loadOccasions();
+                this.setToday();
+                this.renderCalendar();
+            },
+            
+            setToday() {
+                const today = new Date();
+                const jToday = jalaali.toJalaali(today);
+                this.currentYear = jToday.jy;
+                this.currentMonth = jToday.jm;
+            },
+            
+            async loadOccasions() {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/occasions`);
+                    if (response.ok) {
+                        this.occasions = await response.json();
+                    }
+                } catch (error) {
+                    console.error('خطا در دریافت مناسبت‌ها:', error);
+                    // استفاده از مناسبت‌های پیش‌فرض در صورت خطا
+                    this.occasions = {
+                        "1-1": ["آغاز سال نو"],
+                        "1-12": ["روز جمهوری اسلامی ایران"],
+                        "1-13": ["روز طبیعت"],
+                        "11-22": ["پیروزی انقلاب اسلامی"],
+                        "3-14": ["رحلت امام خمینی (ره)"],
+                        "12-29": ["روز ملی شدن صنعت نفت"],
+                        "9-17": ["قبولی اعمال (شب هایله القدر)"],
+                        "12-13": ["تولد حضرت علی (ع)"],
+                        "7-27": ["مبعث رسول اکرم"],
+                        "6-15": ["ولادت امام مهدی (عج)"]
+                    };
+                }
+            },
+            
+            renderCalendar() {
+                const monthNames = [
+                    "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+                    "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"
+                ];
+                
+                document.getElementById("calendarMonthTitle").innerText =
+                    monthNames[this.currentMonth - 1] + " " + this.currentYear;
+                
+                const daysEl = document.getElementById("calendarDays");
+                daysEl.innerHTML = "";
+                
+                const daysCount = jalaali.jalaaliMonthLength(this.currentYear, this.currentMonth);
+                const today = new Date();
+                const jToday = jalaali.toJalaali(today);
+                
+                for (let day = 1; day <= daysCount; day++) {
+                    const div = document.createElement("div");
+                    div.className = "calendar-day";
+                    div.innerText = day;
+                    
+                    // بررسی آیا امروز است
+                    if (day === jToday.jd && this.currentMonth === jToday.jm && this.currentYear === jToday.jy) {
+                        div.classList.add("today");
+                    }
+                    
+                    // بررسی آیا مناسبت دارد
+                    const key = `${this.currentMonth}-${day}`;
+                    if (this.occasions[key]) {
+                        div.classList.add("holiday");
+                        div.title = this.occasions[key].join("، ");
+                    }
+                    
+                    div.onclick = () => {
+                        document.querySelectorAll(".calendar-day").forEach(x => x.classList.remove("selected"));
+                        div.classList.add("selected");
+                        
+                        const occasionListEl = document.getElementById("calendarOccasionList");
+                        if (this.occasions[key]) {
+                            occasionListEl.innerHTML = this.occasions[key].map(occasion => 
+                                `<div class="calendar-occasion-item">${occasion}</div>`
+                            ).join("");
+                        } else {
+                            occasionListEl.innerHTML = '<div class="no-occasion">مناسبتی برای این روز ثبت نشده است</div>';
+                        }
+                    };
+                    
+                    daysEl.appendChild(div);
+                }
+                
+                // انتخاب امروز به صورت خودکار
+                setTimeout(() => {
+                    const todayElement = document.querySelector('.calendar-day.today');
+                    if (todayElement) {
+                        todayElement.click();
+                    }
+                }, 100);
+            },
+            
+            nextMonth() {
+                this.currentMonth++;
+                if (this.currentMonth > 12) {
+                    this.currentMonth = 1;
+                    this.currentYear++;
+                }
+                this.renderCalendar();
+            },
+            
+            prevMonth() {
+                this.currentMonth--;
+                if (this.currentMonth < 1) {
+                    this.currentMonth = 12;
+                    this.currentYear--;
+                }
+                this.renderCalendar();
+            }
+        };
+
         // تابع‌های مودال قوانین
         function showTermsModal() {
             document.getElementById('termsModal').style.display = 'flex';
             document.getElementById('termsContent').style.display = 'block';
             document.getElementById('privacyContent').style.display = 'none';
             
-            // تنظیم تب فعال
             document.querySelectorAll('.terms-tab').forEach(tab => {
                 tab.classList.remove('active');
             });
@@ -4035,7 +4382,7 @@
             }
         };
 
-        // مدیریت نقشه‌ها
+        // مدیریت نقشه‌ها - اصلاح شده برای رفع مشکل geocode
         const MapManager = {
             maps: {},
             markers: {},
@@ -4190,7 +4537,8 @@
                     
                     let marker = null;
                     
-                    map.on('click', function(e) {
+                    // بهبود geocoding با استفاده از Nominatim API
+                    map.on('click', async function(e) {
                         const lat = e.latlng.lat;
                         const lng = e.latlng.lng;
                         
@@ -4202,14 +4550,19 @@
                         marker.bindPopup("موقعیت انتخاب شده").openPopup();
                         
                         document.getElementById('eventCoordinates').textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-                        this.geocodeAddress(lat, lng);
+                        
+                        // درخواست geocode
+                        await this.geocodeAddress(lat, lng);
                     }.bind(this));
                     
                     this.maps.addEvent = map;
                     
                     // مخفی کردن loading
                     setTimeout(() => {
-                        document.getElementById('mapLoading').style.display = 'none';
+                        const mapLoading = document.getElementById('mapLoading');
+                        if (mapLoading) {
+                            mapLoading.style.display = 'none';
+                        }
                     }, 1000);
                     
                 } catch (error) {
@@ -4220,10 +4573,28 @@
             
             async geocodeAddress(lat, lng) {
                 try {
-                    const response = await fetch(`${API_BASE_URL}/geocode?lat=${lat}&lng=${lng}`);
+                    // استفاده از Nominatim API برای geocoding
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=fa`);
+                    
                     if (response.ok) {
                         const data = await response.json();
-                        document.getElementById('eventAddress').value = data.address || `تهران، مختصات: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                        let address = 'تهران';
+                        
+                        if (data && data.address) {
+                            const addr = data.address;
+                            const parts = [];
+                            
+                            if (addr.road) parts.push(addr.road);
+                            if (addr.neighbourhood) parts.push(addr.neighbourhood);
+                            if (addr.suburb) parts.push(addr.suburb);
+                            if (addr.city) parts.push(addr.city);
+                            if (addr.state) parts.push(addr.state);
+                            if (addr.country) parts.push(addr.country);
+                            
+                            address = parts.join('، ');
+                        }
+                        
+                        document.getElementById('eventAddress').value = address || `تهران، مختصات: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
                     } else {
                         document.getElementById('eventAddress').value = `تهران، مختصات: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
                     }
@@ -4277,7 +4648,7 @@
             }
         };
 
-        // مدیریت OTP - بهبود یافته
+        // مدیریت OTP
         const OTPManager = {
             timer: null,
             timeLeft: 120,
@@ -4305,7 +4676,6 @@
                     resendOtpBtn.addEventListener('click', this.resendOTP.bind(this));
                 }
                 
-                // بهبود ورود خودکار OTP
                 otpInputs.forEach((input, index) => {
                     input.dir = 'ltr';
                     input.style.textAlign = 'center';
@@ -4568,10 +4938,9 @@
             }
         };
 
-        // مدیریت نذورات
+        // مدیریت نذورات - اصلاح شده برای حذف بخش مبلغ
         const DonationManager = {
             selectedType: null,
-            selectedAmount: null,
             
             initialize() {
                 console.log("راه‌اندازی مدیریت نذورات");
@@ -4585,11 +4954,6 @@
                 const donateBtn = document.getElementById('donateBtn');
                 if (donateBtn) {
                     donateBtn.addEventListener('click', this.processDonation.bind(this));
-                }
-                
-                const setCustomAmountBtn = document.getElementById('setCustomAmount');
-                if (setCustomAmountBtn) {
-                    setCustomAmountBtn.addEventListener('click', this.setCustomAmount.bind(this));
                 }
                 
                 console.log("مدیریت نذورات راه‌اندازی شد");
@@ -4606,21 +4970,9 @@
                 console.log(`نوع نذری انتخاب شد: ${this.selectedType}`);
             },
             
-            setCustomAmount() {
-                const customAmount = document.getElementById('donationAmount').value;
-                if (!customAmount || customAmount < 1000) {
-                    showModal('خطا', 'لطفاً مبلغ معتبری وارد کنید (حداقل ۱,۰۰۰ تومان).', 'error');
-                    return;
-                }
-                
-                this.selectedAmount = customAmount;
-                console.log(`مبلغ دلخواه تنظیم شد: ${customAmount} تومان`);
-                showModal('موفقیت', `مبلغ ${customAmount} تومان تنظیم شد.`, 'success');
-            },
-            
             async processDonation() {
-                if (!this.selectedType || !this.selectedAmount) {
-                    showModal('خطا', 'لطفاً نوع نذری و مبلغ را انتخاب کنید.', 'error');
+                if (!this.selectedType) {
+                    showModal('خطا', 'لطفاً نوع نذری را انتخاب کنید.', 'error');
                     return;
                 }
                 
@@ -4630,22 +4982,23 @@
                     return;
                 }
                 
-                console.log(`پرداخت نذری: ${this.selectedType}, مبلغ: ${this.selectedAmount}`);
+                console.log(`پرداخت نذری: ${this.selectedType}`);
                 
                 const cardNumber = "6219861918435032";
                 
                 showModal('پرداخت نذری', 
-                    `برای پرداخت نذری، لطفاً مبلغ ${parseFloat(this.selectedAmount).toLocaleString()} تومان را به شماره کارت زیر واریز کنید:\n\n${cardNumber}\n\nپس از واریز، رسید پرداخت را برای ما ارسال کنید.`, 
+                    `برای پرداخت نذری، لطفاً مبلغ دلخواه را به شماره کارت زیر واریز کنید:\n\n${cardNumber}\n\nپس از واریز، رسید پرداخت را برای ما ارسال کنید.`, 
                     'success'
                 );
                 
                 try {
+                    // ثبت درخواست نذری بدون مبلغ
                     const response = await fetch(`${API_BASE_URL}/donations/make-donation`, {
                         method: 'POST',
                         headers: getAuthHeaders(),
                         body: JSON.stringify({
                             donation_type: this.getDonationTypeName(this.selectedType),
-                            amount: parseFloat(this.selectedAmount),
+                            amount: 0, // مبلغ 0 چون کاربر خودش تصمیم می‌گیرد
                             payment_method: 'card'
                         })
                     });
@@ -4674,10 +5027,7 @@
                     opt.classList.remove('selected');
                 });
                 
-                document.getElementById('donationAmount').value = '';
-                
                 this.selectedType = null;
-                this.selectedAmount = null;
             }
         };
 
@@ -4722,7 +5072,6 @@
                 }
             },
 
-            // تابع جدید برای رفرش دستی
             async refreshEvents(silent = false) {
                 try {
                     const response = await fetch(`${API_BASE_URL}/events/public`);
@@ -4964,32 +5313,26 @@
                 const searchFilter = document.getElementById('searchInput')?.value.toLowerCase() || '';
                 
                 this.filtered = this.events.filter(event => {
-                    // فیلتر نوع
                     if (typeFilter !== 'all' && event.type !== typeFilter) {
                         return false;
                     }
                     
-                    // فیلتر دسته‌بندی
                     if (categoryFilter !== 'all' && event.category !== categoryFilter) {
                         return false;
                     }
                     
-                    // فیلتر کشور
                     if (countryFilter !== 'all' && event.country !== countryFilter) {
                         return false;
                     }
                     
-                    // فیلتر استان
                     if (provinceFilter !== 'all' && event.province !== provinceFilter) {
                         return false;
                     }
                     
-                    // فیلتر شهر
                     if (cityFilter !== 'all' && event.city !== cityFilter) {
                         return false;
                     }
                     
-                    // فیلتر جستجو
                     if (searchFilter && !event.title.toLowerCase().includes(searchFilter) && 
                         !event.location.toLowerCase().includes(searchFilter) && 
                         !event.host.toLowerCase().includes(searchFilter)) {
@@ -5305,6 +5648,8 @@
                     } else if (pageId === 'addEventPage') {
                         MapManager.initializeAddEventMap();
                         initEventForm();
+                    } else if (pageId === 'calendarPage') {
+                        CalendarManager.init();
                     }
                 }, 100);
                 
@@ -5729,10 +6074,11 @@
                 });
             });
             
-            document.querySelectorAll('.calendar-btn').forEach(btn => {
+            // event listener برای دکمه تقویم
+            document.querySelectorAll('.open-calendar-btn').forEach(btn => {
                 btn.addEventListener('click', function(e) {
                     e.preventDefault();
-                    showModal('تقویم', 'این بخش به زودی راه‌اندازی خواهد شد.', 'info');
+                    navigateTo('calendarPage');
                 });
             });
             
