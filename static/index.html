@@ -1272,15 +1272,15 @@
 
         .stat-cards {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.8rem;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
             margin: 1rem 0;
         }
 
         .stat-card-new {
             background: var(--card-bg);
-            border-radius: 0.8rem;
-            padding: 1rem;
+            border-radius: 0.6rem;
+            padding: 0.8rem;
             text-align: center;
             box-shadow: var(--shadow);
             border: 1px solid var(--glass-border);
@@ -1288,21 +1288,21 @@
         }
 
         .stat-card-new .icon {
-            font-size: 1.5rem;
-            margin-bottom: 0.5rem;
+            font-size: 1.2rem;
+            margin-bottom: 0.3rem;
             color: var(--accent-2);
         }
 
         .stat-card-new .value {
-            font-size: 1.2rem;
+            font-size: 1rem;
             font-weight: bold;
             color: var(--accent-1);
-            margin-bottom: 0.3rem;
+            margin-bottom: 0.2rem;
         }
 
         .stat-card-new .label {
             color: var(--muted);
-            font-size: 0.8rem;
+            font-size: 0.7rem;
         }
 
         .muted {
@@ -1576,30 +1576,27 @@
             border: 1px solid rgba(15,23,36,0.06);
         }
 
-        /* بهینه‌سازی استایل دکمه‌های ثبت‌نام در دسکتاپ */
         .event-actions {
             display: flex;
             gap: 0.5rem;
             margin-top: 1rem;
             flex-wrap: wrap;
-            justify-content: center;
         }
 
         .event-action-btn {
             flex: 1;
-            padding: 0.5rem 0.7rem;
+            padding: 0.6rem 0.8rem;
             border-radius: 0.5rem;
             border: 1px solid rgba(15,23,36,0.1);
             background: white;
             cursor: pointer;
             transition: all 0.3s ease;
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 0.3rem;
-            min-width: 100px;
-            max-width: 150px;
+            min-width: 120px;
         }
 
         .event-action-btn:hover {
@@ -1651,7 +1648,7 @@
             transition: width 0.3s ease;
         }
 
-        /* استایل‌های جدید برای OTP - بهبود یافته */
+        /* استایل‌های جدید برای OTP - اصلاح شده برای چپ به راست */
         .otp-container {
             display: flex;
             gap: 0.5rem;
@@ -1673,7 +1670,6 @@
             background: white;
             transition: all 0.3s ease;
             direction: ltr;
-            font-family: monospace;
         }
 
         .otp-input:focus {
@@ -1707,7 +1703,7 @@
             cursor: not-allowed;
         }
 
-        /* استایل‌های جدید برای نذورات - اصلاح شده */
+        /* استایل‌های جدید برای نذورات */
         .donation-section {
             background: var(--card-bg);
             border-radius: var(--radius);
@@ -1767,10 +1763,51 @@
             color: var(--accent-2);
         }
 
-        /* حذف بخش مبلغ‌ها */
-        .donation-amounts,
+        .donation-amounts {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 1rem 0;
+            display: none; /* مخفی کردن بخش مبلغ */
+        }
+
+        .amount-btn {
+            padding: 0.6rem 1rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 1.5rem;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.8rem;
+            display: none; /* مخفی کردن دکمه‌های مبلغ */
+        }
+
+        .amount-btn:hover {
+            border-color: var(--accent-2);
+        }
+
+        .amount-btn.selected {
+            background: var(--accent-2);
+            color: white;
+            border-color: var(--accent-2);
+        }
+
         .custom-amount {
-            display: none !important;
+            display: flex;
+            gap: 0.5rem;
+            margin: 1rem 0;
+            flex-direction: column;
+            display: none; /* مخفی کردن بخش مبلغ دلخواه */
+        }
+
+        .custom-amount input {
+            flex: 1;
+            padding: 0.8rem;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+            font-size: 1rem;
+            display: none; /* مخفی کردن ورودی مبلغ */
         }
 
         .card-number-display {
@@ -2391,25 +2428,8 @@
                 grid-template-columns: repeat(4, 1fr);
             }
             
-            /* بهبود کارت‌های آمار در دسکتاپ */
             .stat-cards {
                 grid-template-columns: repeat(4, 1fr);
-            }
-            
-            .stat-card-new .icon {
-                font-size: 1.8rem;
-            }
-            
-            .stat-card-new .value {
-                font-size: 1.3rem;
-            }
-            
-            /* بهبود دکمه‌های ثبت‌نام در دسکتاپ */
-            .event-action-btn {
-                min-width: 120px;
-                max-width: 140px;
-                font-size: 0.8rem;
-                padding: 0.6rem 0.8rem;
             }
             
             .nav-links {
@@ -2436,15 +2456,6 @@
             
             .features-grid {
                 grid-template-columns: repeat(2, 1fr);
-            }
-            
-            /* بهبود بیشتر کارت‌های آمار در دسکتاپ بزرگ */
-            .stat-card-new .icon {
-                font-size: 2rem;
-            }
-            
-            .stat-card-new .value {
-                font-size: 1.5rem;
             }
         }
 
@@ -2487,7 +2498,6 @@
             
             .event-action-btn {
                 width: 100%;
-                max-width: 100%;
             }
             
             .otp-input {
@@ -2504,28 +2514,30 @@
                 grid-template-columns: repeat(2, 1fr);
             }
             
-            /* بهبود کارت‌های آمار در موبایل */
-            .stat-cards {
-                grid-template-columns: repeat(4, 1fr);
-                gap: 0.5rem;
+            /* تغییر اندازه کارت‌های رویداد در موبایل */
+            .event-item {
+                padding: 0.8rem;
+                margin-bottom: 0.6rem;
             }
             
-            .stat-card-new {
-                padding: 0.6rem;
-            }
-            
-            .stat-card-new .icon {
-                font-size: 1.2rem;
+            .event-meta h4 {
+                font-size: 0.9rem;
                 margin-bottom: 0.3rem;
             }
             
-            .stat-card-new .value {
-                font-size: 0.9rem;
-                margin-bottom: 0.2rem;
+            .event-meta p {
+                font-size: 0.75rem;
             }
             
-            .stat-card-new .label {
-                font-size: 0.65rem;
+            .type-pill {
+                padding: 0.3rem 0.6rem;
+                font-size: 0.7rem;
+            }
+            
+            .event-action-btn {
+                min-width: 80px;
+                padding: 0.4rem 0.6rem;
+                font-size: 0.7rem;
             }
         }
 
@@ -2567,7 +2579,23 @@
             }
             
             .stat-cards {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: repeat(4, 1fr);
+            }
+            
+            .stat-card-new {
+                padding: 0.5rem;
+            }
+            
+            .stat-card-new .icon {
+                font-size: 1rem;
+            }
+            
+            .stat-card-new .value {
+                font-size: 0.8rem;
+            }
+            
+            .stat-card-new .label {
+                font-size: 0.6rem;
             }
             
             .feature-card h3 {
@@ -2598,26 +2626,13 @@
                 padding: 1rem;
             }
             
-            /* بهبود بیشتر کارت‌های آمار در موبایل بسیار کوچک */
             .stat-cards {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 0.4rem;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 0.3rem;
             }
             
             .stat-card-new {
-                padding: 0.5rem;
-            }
-            
-            .stat-card-new .icon {
-                font-size: 1rem;
-            }
-            
-            .stat-card-new .value {
-                font-size: 0.8rem;
-            }
-            
-            .stat-card-new .label {
-                font-size: 0.6rem;
+                padding: 0.4rem;
             }
         }
 
@@ -2632,7 +2647,7 @@
             border-radius: 10px;
         }
 
-        ::-webkit-scrollbar-thumb {
+        ::-webkit scrollbar-thumb {
             background: var(--accent-2);
             border-radius: 10px;
         }
@@ -3068,7 +3083,7 @@
                         6219 8619 1843 5032
                     </div>
                     <p style="color: var(--muted); margin-top: 0.5rem; font-size: 0.85rem;">
-                        برای پرداخت نذری، مبلغ مورد نظر خود را به شماره کارت بالا واریز کنید و سپس رسید پرداخت را برای ما ارسال نمایید.
+                        برای پرداخت نذری، مبلغ مورد نظر خود را به شماره کارت بالا واریز کنید
                     </p>
                 </div>
                 <div class="button-group">
@@ -4253,23 +4268,27 @@
                     const response = await fetch(`${API_BASE_URL}/geocode?lat=${lat}&lng=${lng}`);
                     if (response.ok) {
                         const data = await response.json();
-                        if (data.address && data.address !== "خطا در دریافت آدرس") {
-                            document.getElementById('eventAddress').value = data.address;
-                        } else {
-                            // استفاده از آدرس پیش‌فرض
-                            const city = document.getElementById('eventCity').value || 'تهران';
-                            document.getElementById('eventAddress').value = `${city}، مختصات: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                        const address = data.address || `تهران، مختصات: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                        document.getElementById('eventAddress').value = address;
+                        
+                        // استفاده از Nominatim برای گرفتن آدرس دقیق‌تر
+                        try {
+                            const osmResponse = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=fa`);
+                            if (osmResponse.ok) {
+                                const osmData = await osmResponse.json();
+                                if (osmData.display_name) {
+                                    document.getElementById('eventAddress').value = osmData.display_name;
+                                }
+                            }
+                        } catch (osmError) {
+                            console.log('استفاده از آدرس اولیه');
                         }
                     } else {
-                        // استفاده از آدرس پیش‌فرض
-                        const city = document.getElementById('eventCity').value || 'تهران';
-                        document.getElementById('eventAddress').value = `${city}، مختصات: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                        document.getElementById('eventAddress').value = `تهران، مختصات: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
                     }
                 } catch (error) {
                     console.error('خطا در دریافت آدرس:', error);
-                    // استفاده از آدرس پیش‌فرض
-                    const city = document.getElementById('eventCity').value || 'تهران';
-                    document.getElementById('eventAddress').value = `${city}، مختصات: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                    document.getElementById('eventAddress').value = `تهران، مختصات: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
                 }
             },
             
@@ -4317,7 +4336,7 @@
             }
         };
 
-        // مدیریت OTP - بهبود یافته
+        // مدیریت OTP - بهبود یافته با قابلیت ورود خودکار
         const OTPManager = {
             timer: null,
             timeLeft: 120,
@@ -4345,54 +4364,46 @@
                     resendOtpBtn.addEventListener('click', this.resendOTP.bind(this));
                 }
                 
-                // بهبود ورود خودکار OTP - قابلیت کپی-پیست
+                // بهبود ورود خودکار OTP
                 otpInputs.forEach((input, index) => {
                     input.dir = 'ltr';
                     input.style.textAlign = 'center';
                     
-                    // اجازه paste کردن کد کامل
-                    input.addEventListener('paste', (e) => {
-                        e.preventDefault();
-                        const pastedText = e.clipboardData.getData('text').trim();
-                        
-                        if (/^\d{5}$/.test(pastedText)) {
-                            // اگر کد ۵ رقمی paste شده
-                            const digits = pastedText.split('');
-                            otpInputs.forEach((inputElement, idx) => {
-                                if (idx < 5) {
-                                    inputElement.value = digits[idx];
-                                }
-                            });
-                            
-                            // فوکوس روی آخرین خانه
-                            if (otpInputs[4]) {
-                                otpInputs[4].focus();
-                            }
-                            
-                            this.checkOTPComplete();
-                        }
-                    });
-                    
+                    // پشتیبانی از ورود خودکار در موبایل
                     input.addEventListener('input', (e) => {
                         const value = e.target.value;
                         
-                        // فقط اعداد مجاز هستند
                         if (!/^\d?$/.test(value)) {
                             e.target.value = '';
                             return;
                         }
                         
-                        // اگر مقدار وارد شده، به خانه بعدی برو
                         if (value && index < otpInputs.length - 1) {
                             otpInputs[index + 1].focus();
                         }
                         
-                        // اگر آخرین خانه پر شد، دکمه تأیید را فعال کن
                         if (index === otpInputs.length - 1 && value) {
                             document.getElementById('verifyOtpBtn').focus();
                         }
                         
                         this.checkOTPComplete();
+                    });
+                    
+                    input.addEventListener('paste', (e) => {
+                        e.preventDefault();
+                        const pastedData = e.clipboardData.getData('text').trim();
+                        if (/^\d{5}$/.test(pastedData)) {
+                            const digits = pastedData.split('');
+                            otpInputs.forEach((input, i) => {
+                                if (i < 5) {
+                                    input.value = digits[i] || '';
+                                }
+                            });
+                            this.checkOTPComplete();
+                            if (digits.length === 5) {
+                                this.verifyOTP();
+                            }
+                        }
                     });
                     
                     input.addEventListener('keydown', (e) => {
@@ -4406,7 +4417,35 @@
                     });
                 });
                 
+                // اضافه کردن قابلیت خواندن پیامک در مرورگر (فقط برای تست)
+                if ('OTPCredential' in window) {
+                    this.setupSMSReceiver();
+                }
+                
                 console.log("مدیریت OTP راه‌اندازی شد");
+            },
+            
+            setupSMSReceiver() {
+                // این بخش برای مرورگرهایی که از WebOTP API پشتیبانی می‌کنند
+                if ('OTPCredential' in window) {
+                    navigator.credentials.get({
+                        otp: { transport: ['sms'] }
+                    }).then(otp => {
+                        if (otp && otp.code) {
+                            const digits = otp.code.split('');
+                            const otpInputs = document.querySelectorAll('.otp-input');
+                            otpInputs.forEach((input, i) => {
+                                if (i < 5 && digits[i]) {
+                                    input.value = digits[i];
+                                }
+                            });
+                            this.checkOTPComplete();
+                            setTimeout(() => this.verifyOTP(), 500);
+                        }
+                    }).catch(err => {
+                        console.log('WebOTP API error:', err);
+                    });
+                }
             },
             
             async handleSignup() {
@@ -4511,6 +4550,9 @@
                         this.startTimer();
                         
                         showModal('ارسال کد', 'کد تأیید به شماره شما ارسال شد.', 'success');
+                        
+                        // فعال کردن WebOTP API برای موبایل
+                        this.setupSMSReceiver();
                         
                     } else {
                         const error = await response.json();
@@ -4634,7 +4676,7 @@
             }
         };
 
-        // مدیریت نذورات
+        // مدیریت نذورات - حذف بخش مبلغ
         const DonationManager = {
             selectedType: null,
             
@@ -4683,7 +4725,7 @@
                 const cardNumber = "6219861918435032";
                 
                 showModal('پرداخت نذری', 
-                    `برای پرداخت نذری، لطفاً مبلغ مورد نظر خود را به شماره کارت زیر واریز کنید:\n\n${cardNumber}\n\nپس از واریز، رسید پرداخت را برای ما ارسال کنید.`, 
+                    `برای پرداخت نذری ${this.getDonationTypeName(this.selectedType)}، لطفاً مبلغ مورد نظر خود را به شماره کارت زیر واریز کنید:\n\n${cardNumber}\n\nپس از واریز، رسید پرداخت را برای ما ارسال کنید.`, 
                     'success'
                 );
                 
@@ -4693,7 +4735,7 @@
                         headers: getAuthHeaders(),
                         body: JSON.stringify({
                             donation_type: this.getDonationTypeName(this.selectedType),
-                            amount: 0, // مبلغ به صورت دلخواه توسط کاربر واریز می‌شود
+                            amount: 0, // مقدار ثابت
                             payment_method: 'card'
                         })
                     });
@@ -4767,7 +4809,6 @@
                 }
             },
 
-            // تابع جدید برای رفرش دستی
             async refreshEvents(silent = false) {
                 try {
                     const response = await fetch(`${API_BASE_URL}/events/public`);
@@ -5777,7 +5818,8 @@
             document.querySelectorAll('.calendar-btn').forEach(btn => {
                 btn.addEventListener('click', function(e) {
                     e.preventDefault();
-                    window.open('/calendar', '_blank');
+                    // هدایت به صفحه تقویم مناره
+                    window.open(`${API_BASE_URL}/calendar`, '_blank');
                 });
             });
             
