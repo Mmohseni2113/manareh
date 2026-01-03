@@ -57,11 +57,9 @@ def home():
 def test_database_connection():
     try:
         database_urls = [
-            # اولویت اول: Railway database
-            "mysql+pymysql://root:fNCKZuguXMprcpWgfFtrxcQMXnEvVLAE@yamabiko.proxy.rlwy.net:40321/railway",
-            # دوم: اتصالات محلی به عنوان fallback
-            "mysql+pymysql://M.mohseni:123m456o789h@127.0.0.1/manareh",
             "mysql+pymysql://M.mohseni:123m456o789h@localhost/manareh",
+            "mysql+pymysql://root:@localhost/manareh",
+            "mysql+pymysql://M.mohseni:123m456o789h@127.0.0.1/manareh",
         ]
         
         for db_url in database_urls:
@@ -87,13 +85,12 @@ def test_database_connection():
 DATABASE_URL = test_database_connection()
 
 if not DATABASE_URL:
-    DATABASE_URL = "sqlite:///./manareh.db"
-    logger.info("استفاده از SQLite به عنوان fallback")
+    DATABASE_URL = "mysql+pymysql://M.mohseni:123m456o789h@localhost/manareh"
+    logger.info("استفاده از اتصال پیش‌فرض MySQL")
 
 logger.info(f"اتصال نهایی: {DATABASE_URL}")
 
 engine = create_engine(DATABASE_URL, 
-                      connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
                       pool_pre_ping=True,
                       pool_recycle=300)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -617,7 +614,7 @@ class SignupStep1Response(BaseModel):
 # مدل جدید برای نذورات
 class DonationCreate(BaseModel):
     donation_type: str
-    amount: float
+    amount: float = 0.0
     payment_method: str = "card"
 
 # مدل جدید برای دسته‌بندی
@@ -708,6 +705,10 @@ async def get_optional_current_user(token: str = Depends(oauth2_scheme), db: Ses
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://manareh.com",
+        "http://manareh.com",
+        "https://www.manareh.com",
+        "http://www.manareh.com",
         "https://manareh.onrender.com",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
@@ -1305,7 +1306,7 @@ async def make_donation(
         notification = Notification(
             user_id=current_user.id,
             title="درخواست پرداخت نذری",
-            message=f"برای پرداخت {donation_data.amount} تومان نذری {donation_data.donation_type}، مبلغ را به شماره کارت {card_number} واریز کنید.",
+            message=f"برای پرداخت نذری {donation_data.donation_type}، مبلغ را به شماره کارت {card_number} واریز کنید.",
             type="donation"
         )
         db.add(notification)
@@ -1314,7 +1315,6 @@ async def make_donation(
         return {
             "message": "برای پرداخت نذری، مبلغ را به شماره کارت زیر واریز کنید",
             "card_number": card_number,
-            "amount": donation_data.amount,
             "donation_type": donation_data.donation_type,
             "note": "پس از واریز، رسید پرداخت را برای ما ارسال کنید."
         }
@@ -2638,7 +2638,7 @@ async def test_db(db: Session = Depends(get_db)):
             "favorites_count": favorites_count,
             "users": users_list,
             "events": events_list,
-            "database_type": "SQLite" if "sqlite" in DATABASE_URL else "MySQL"
+            "database_type": "MySQL"
         }
     except Exception as e:
         return {"error": str(e), "status": "خطا در اتصال به دیتابیس"}
@@ -2668,7 +2668,7 @@ async def pay_donation(
         notification = Notification(
             user_id=current_user.id,
             title="درخواست پرداخت نذری",
-            message=f"برای پرداخت {donation_data.amount:,} تومان نذری {donation_data.donation_type}، لطفاً مبلغ را به شماره کارت {card_number} واریز کنید.",
+            message=f"برای پرداخت نذری {donation_data.donation_type}، لطفاً مبلغ را به شماره کارت {card_number} واریز کنید.",
             type="donation"
         )
         db.add(notification)
@@ -2678,7 +2678,6 @@ async def pay_donation(
             "success": True,
             "message": "برای پرداخت نذری، مبلغ را به شماره کارت زیر واریز کنید",
             "card_number": card_number,
-            "amount": donation_data.amount,
             "donation_type": donation_data.donation_type,
             "note": "پس از واریز، رسید پرداخت را برای ما ارسال کنید."
         }
@@ -3023,8 +3022,10 @@ async def get_calendar_page():
         
         <script src="https://cdn.jsdelivr.net/npm/jalaali-js/dist/jalaali.min.js"></script>
         <script>
+            // دریافت تاریخ امروز
             let today = new Date();
-            let jToday = jalaali.toJalaali(today);
+            // تبدیل به تاریخ شمسی
+            let jToday = jalaali.toJalaali(today.getFullYear(), today.getMonth() + 1, today.getDate());
             
             let year = jToday.jy;
             let month = jToday.jm;
@@ -3069,6 +3070,16 @@ async def get_calendar_page():
                 daysEl.innerHTML = "";
                 
                 const daysCount = jalaali.jalaaliMonthLength(year, month);
+                const firstDay = jalaali.jalaaliToGregorian(year, month, 1);
+                const startDay = new Date(firstDay.gy, firstDay.gm - 1, firstDay.gd).getDay();
+                
+                // روزهای خالی قبل از اول ماه
+                for (let i = 0; i < (startDay + 1) % 7; i++) {
+                    const emptyDiv = document.createElement("div");
+                    emptyDiv.className = "day";
+                    emptyDiv.style.visibility = "hidden";
+                    daysEl.appendChild(emptyDiv);
+                }
                 
                 for (let d = 1; d <= daysCount; d++) {
                     const div = document.createElement("div");
@@ -3101,6 +3112,14 @@ async def get_calendar_page():
                     
                     daysEl.appendChild(div);
                 }
+                
+                // انتخاب امروز به صورت خودکار
+                setTimeout(() => {
+                    const todayElement = document.querySelector('.day.today');
+                    if (todayElement) {
+                        todayElement.click();
+                    }
+                }, 100);
             }
             
             function nextMonth() {
@@ -3120,14 +3139,6 @@ async def get_calendar_page():
                 }
                 render();
             }
-            
-            // انتخاب امروز به صورت خودکار
-            setTimeout(() => {
-                const todayElement = document.querySelector('.day.today');
-                if (todayElement) {
-                    todayElement.click();
-                }
-            }, 100);
         </script>
     </body>
     </html>
