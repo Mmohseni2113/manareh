@@ -1270,16 +1270,17 @@
             color: #007a65;
         }
 
+        /* بهبود استایل کارت‌های آمار برای موبایل */
         .stat-cards {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 0.5rem;
+            gap: 0.8rem;
             margin: 1rem 0;
         }
 
         .stat-card-new {
             background: var(--card-bg);
-            border-radius: 0.6rem;
+            border-radius: 0.8rem;
             padding: 0.8rem;
             text-align: center;
             box-shadow: var(--shadow);
@@ -1294,7 +1295,7 @@
         }
 
         .stat-card-new .value {
-            font-size: 1rem;
+            font-size: 1.1rem;
             font-weight: bold;
             color: var(--accent-1);
             margin-bottom: 0.2rem;
@@ -1763,51 +1764,9 @@
             color: var(--accent-2);
         }
 
-        .donation-amounts {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            justify-content: center;
-            margin: 1rem 0;
-            display: none; /* مخفی کردن بخش مبلغ */
-        }
-
-        .amount-btn {
-            padding: 0.6rem 1rem;
-            border: 1px solid #e5e7eb;
-            border-radius: 1.5rem;
-            background: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 0.8rem;
-            display: none; /* مخفی کردن دکمه‌های مبلغ */
-        }
-
-        .amount-btn:hover {
-            border-color: var(--accent-2);
-        }
-
-        .amount-btn.selected {
-            background: var(--accent-2);
-            color: white;
-            border-color: var(--accent-2);
-        }
-
-        .custom-amount {
-            display: flex;
-            gap: 0.5rem;
-            margin: 1rem 0;
-            flex-direction: column;
-            display: none; /* مخفی کردن بخش مبلغ دلخواه */
-        }
-
-        .custom-amount input {
-            flex: 1;
-            padding: 0.8rem;
-            border-radius: 0.5rem;
-            border: 1px solid #e5e7eb;
-            font-size: 1rem;
-            display: none; /* مخفی کردن ورودی مبلغ */
+        /* حذف کامل بخش مبلغ کمک */
+        .donation-amounts, .custom-amount {
+            display: none !important;
         }
 
         .card-number-display {
@@ -2352,6 +2311,97 @@
             border-color: var(--accent-2);
         }
 
+        /* استایل جدید: دکمه چشم برای نمایش رمز */
+        .password-container {
+            position: relative;
+        }
+
+        .toggle-password {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            padding: 5px;
+            font-size: 1rem;
+            z-index: 2;
+        }
+
+        .toggle-password:hover {
+            color: var(--accent-2);
+        }
+
+        .password-container input {
+            padding-left: 45px !important;
+        }
+
+        /* دکمه WebOTP */
+        .web-otp-btn {
+            background: var(--accent-2);
+            color: white;
+            border: none;
+            padding: 0.6rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            justify-content: center;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .web-otp-btn:hover {
+            background: var(--accent-1);
+            transform: translateY(-2px);
+        }
+
+        .web-otp-btn:disabled {
+            background: var(--gray);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* بهبود کارت‌های ثبت‌نام در دسکتاپ */
+        @media (min-width: 768px) {
+            .auth-card {
+                max-width: 450px;
+                margin: 0 auto;
+                padding: 1.5rem;
+            }
+            
+            .auth-card .form-row {
+                flex-direction: row;
+                gap: 1.5rem;
+            }
+            
+            .stat-cards {
+                grid-template-columns: repeat(4, 1fr);
+            }
+            
+            .stat-card-new {
+                padding: 0.8rem;
+            }
+            
+            .stat-card-new .icon {
+                font-size: 1.5rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .stat-card-new .value {
+                font-size: 1.3rem;
+            }
+            
+            .stat-card-new .label {
+                font-size: 0.8rem;
+            }
+        }
+
         /* Media Queries */
         @media (min-width: 768px) {
             section {
@@ -2428,10 +2478,6 @@
                 grid-template-columns: repeat(4, 1fr);
             }
             
-            .stat-cards {
-                grid-template-columns: repeat(4, 1fr);
-            }
-            
             .nav-links {
                 display: flex;
             }
@@ -2442,20 +2488,6 @@
             
             .category-filters {
                 grid-template-columns: repeat(4, 1fr);
-            }
-        }
-
-        @media (min-width: 992px) {
-            .hero-text h1 {
-                font-size: 2.5rem;
-            }
-            
-            .section-title h2 {
-                font-size: 2rem;
-            }
-            
-            .features-grid {
-                grid-template-columns: repeat(2, 1fr);
             }
         }
 
@@ -2484,12 +2516,28 @@
                 font-size: 1.5rem;
             }
             
+            /* بهبود کارت‌ها در موبایل */
             .features-grid {
                 grid-template-columns: 1fr;
+                gap: 1rem;
             }
             
             .feature-card {
                 padding: 1rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .feature-icon {
+                width: 3rem;
+                height: 3rem;
+            }
+            
+            .feature-card h3 {
+                font-size: 1rem;
+            }
+            
+            .feature-card p {
+                font-size: 0.8rem;
             }
             
             .event-actions {
@@ -2514,30 +2562,28 @@
                 grid-template-columns: repeat(2, 1fr);
             }
             
-            /* تغییر اندازه کارت‌های رویداد در موبایل */
-            .event-item {
-                padding: 0.8rem;
-                margin-bottom: 0.6rem;
+            /* کارت‌های آمار در موبایل */
+            .stat-cards {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.6rem;
             }
             
-            .event-meta h4 {
-                font-size: 0.9rem;
+            .stat-card-new {
+                padding: 0.6rem;
+            }
+            
+            .stat-card-new .icon {
+                font-size: 1rem;
                 margin-bottom: 0.3rem;
             }
             
-            .event-meta p {
-                font-size: 0.75rem;
+            .stat-card-new .value {
+                font-size: 0.9rem;
+                margin-bottom: 0.1rem;
             }
             
-            .type-pill {
-                padding: 0.3rem 0.6rem;
-                font-size: 0.7rem;
-            }
-            
-            .event-action-btn {
-                min-width: 80px;
-                padding: 0.4rem 0.6rem;
-                font-size: 0.7rem;
+            .stat-card-new .label {
+                font-size: 0.65rem;
             }
         }
 
@@ -2578,32 +2624,16 @@
                 grid-template-columns: repeat(2, 1fr);
             }
             
-            .stat-cards {
-                grid-template-columns: repeat(4, 1fr);
-            }
-            
-            .stat-card-new {
-                padding: 0.5rem;
-            }
-            
-            .stat-card-new .icon {
-                font-size: 1rem;
-            }
-            
-            .stat-card-new .value {
-                font-size: 0.8rem;
-            }
-            
-            .stat-card-new .label {
-                font-size: 0.6rem;
-            }
-            
             .feature-card h3 {
-                font-size: 1rem;
+                font-size: 0.95rem;
             }
             
             .feature-card p {
-                font-size: 0.8rem;
+                font-size: 0.75rem;
+            }
+            
+            .stat-cards {
+                grid-template-columns: repeat(2, 1fr);
             }
         }
 
@@ -2626,13 +2656,17 @@
                 padding: 1rem;
             }
             
-            .stat-cards {
-                grid-template-columns: repeat(4, 1fr);
-                gap: 0.3rem;
+            .feature-card {
+                padding: 0.8rem;
             }
             
-            .stat-card-new {
-                padding: 0.4rem;
+            .feature-icon {
+                width: 2.5rem;
+                height: 2.5rem;
+            }
+            
+            .stat-cards {
+                grid-template-columns: 1fr;
             }
         }
 
@@ -2647,7 +2681,7 @@
             border-radius: 10px;
         }
 
-        ::-webkit scrollbar-thumb {
+        ::-webkit-scrollbar-thumb {
             background: var(--accent-2);
             border-radius: 10px;
         }
@@ -2744,6 +2778,48 @@
             50% { transform: scale(1.05); }
             100% { transform: scale(1); }
         }
+
+        /* بهبود ظاهر فیلترها */
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.8rem;
+            margin: 1rem 0;
+        }
+
+        .filter-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .filter-item label {
+            font-size: 0.85rem;
+            color: var(--muted);
+            font-weight: 500;
+        }
+
+        .search-box {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.8rem 2.5rem 0.8rem 0.8rem;
+            border-radius: 0.5rem;
+            border: 1px solid rgba(15,23,36,0.1);
+            background: white;
+            font-size: 0.9rem;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 0.8rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--muted);
+        }
     </style>
 </head>
 <body>
@@ -2809,7 +2885,7 @@
                         <li><a href="#features" class="nav-link">ویژگی‌ها</a></li>
                         <li><a href="#map-section" class="nav-link">مراسم‌ها</a></li>
                         <li><a href="#" class="digital-library-btn nav-link">کتابخانه دیجیتال</a></li>
-                        <li><a href="#" class="calendar-btn nav-link">تقویم</a></li>
+                        <li><a href="/calendar" target="_blank" class="nav-link">تقویم</a></li>
                         <li><a href="#donations-section" class="nav-link">نذورات</a></li>
                         <li><a href="#contact" class="nav-link">تماس با ما</a></li>
                     </ul>
@@ -2825,7 +2901,7 @@
                     <li><a href="#features" class="nav-link">ویژگی‌ها</a></li>
                     <li><a href="#map-section" class="nav-link">مراسم‌ها</a></li>
                     <li><a href="#" class="digital-library-btn nav-link">کتابخانه دیجیتال</a></li>
-                    <li><a href="#" class="calendar-btn nav-link">تقویم</a></li>
+                    <li><a href="/calendar" target="_blank" class="nav-link">تقویم</a></li>
                     <li><a href="#donations-section" class="nav-link">نذورات</a></li>
                     <li><a href="#contact" class="nav-link">تماس با ما</a></li>
                 </ul>
@@ -3077,14 +3153,19 @@
                         <p>همکاری در برگزاری مراسم</p>
                     </div>
                 </div>
-                <div class="card-number-display">
-                    <h4>شماره کارت برای واریز:</h4>
-                    <div style="font-size: 1.3rem; font-weight: bold; color: var(--accent-2); direction: ltr; letter-spacing: 1px; margin: 0.5rem 0;">
-                        6219 8619 1843 5032
+                
+                <!-- فقط شماره کارت نمایش داده می‌شود -->
+                <div class="form-group">
+                    <label>روش پرداخت</label>
+                    <div class="card-number-display">
+                        <h4>شماره کارت برای واریز:</h4>
+                        <div style="font-size: 1.3rem; font-weight: bold; color: var(--accent-2); direction: ltr; letter-spacing: 1px; margin: 0.5rem 0;">
+                            6219 8619 1843 5032
+                        </div>
+                        <p style="color: var(--muted); margin-top: 0.5rem; font-size: 0.85rem;">
+                            برای پرداخت نذری، مبلغ را به شماره کارت بالا واریز کنید
+                        </p>
                     </div>
-                    <p style="color: var(--muted); margin-top: 0.5rem; font-size: 0.85rem;">
-                        برای پرداخت نذری، مبلغ مورد نظر خود را به شماره کارت بالا واریز کنید
-                    </p>
                 </div>
                 <div class="button-group">
                     <button class="btn primary" id="donateBtn">ثبت درخواست نذری</button>
@@ -3171,7 +3252,7 @@
                             <li><a href="#features" class="nav-link">ویژگی‌ها</a></li>
                             <li><a href="#map-section" class="nav-link">مراسم‌ها</a></li>
                             <li><a href="#" class="digital-library-btn nav-link">کتابخانه دیجیتال</a></li>
-                            <li><a href="#" class="calendar-btn nav-link">تقویم</a></li>
+                            <li><a href="/calendar" target="_blank" class="nav-link">تقویم</a></li>
                             <li><a href="#donations-section" class="nav-link">نذورات</a></li>
                             <li><a href="#contact" class="nav-link">تماس با ما</a></li>
                         </ul>
@@ -3212,7 +3293,12 @@
                     </div>
                     <div class="input required">
                         <label for="loginPassword">رمز عبور</label>
-                        <input type="password" id="loginPassword" placeholder="رمز عبور" autocomplete="current-password">
+                        <div class="password-container">
+                            <input type="password" id="loginPassword" placeholder="رمز عبور" autocomplete="current-password">
+                            <button type="button" class="toggle-password" id="toggleLoginPassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="link-small"><a onclick="showTab('signup')">ثبت نام کنید</a></div>
                     <label class="checkbox">
@@ -3251,17 +3337,7 @@
                         <div style="display: flex; gap: 0.5rem; flex-direction: column;">
                             <select id="signupPhonePrefix" style="width: 100%;">
                                 <option value="+98">+98 (ایران)</option>
-                                <option value="+90">+90 (ترکیه)</option>
-                                <option value="+966">+966 (عربستان)</option>
                                 <option value="+964">+964 (عراق)</option>
-                                <option value="+971">+971 (امارات)</option>
-                                <option value="+974">+974 (قطر)</option>
-                                <option value="+965">+965 (کویت)</option>
-                                <option value="+968">+968 (عمان)</option>
-                                <option value="+961">+961 (لبنان)</option>
-                                <option value="+962">+962 (اردن)</option>
-                                <option value="+20">+20 (مصر)</option>
-                                <option value="+963">+963 (سوریه)</option>
                             </select>
                             <input id="signupPhone" type="tel" placeholder="شماره تماس" autocomplete="tel">
                         </div>
@@ -3273,18 +3349,7 @@
                         <select id="signupCountry">
                             <option value="" disabled selected>انتخاب کشور</option>
                             <option value="iran">ایران</option>
-                            <option value="turkey">ترکیه</option>
-                            <option value="saudi-arabia">عربستان سعودی</option>
                             <option value="iraq">عراق</option>
-                            <option value="uae">امارات متحده عربی</option>
-                            <option value="qatar">قطر</option>
-                            <option value="kuwait">کویت</option>
-                            <option value="oman">عمان</option>
-                            <option value="lebanon">لبنان</option>
-                            <option value="jordan">اردن</option>
-                            <option value="egypt">مصر</option>
-                            <option value="syria">سوریه</option>
-                            <option value="other">سایر</option>
                         </select>
                     </div>
                     <div class="input required">
@@ -3310,11 +3375,21 @@
                     <div class="form-row">
                         <div class="input required">
                             <label for="signupPassword">رمز عبور</label>
-                            <input id="signupPassword" type="password" placeholder="رمز عبور" autocomplete="new-password">
+                            <div class="password-container">
+                                <input id="signupPassword" type="password" placeholder="رمز عبور" autocomplete="new-password">
+                                <button type="button" class="toggle-password" id="toggleSignupPassword">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="input required">
                             <label for="signupPassword2">تکرار رمز عبور</label>
-                            <input id="signupPassword2" type="password" placeholder="تکرار رمز عبور" autocomplete="new-password">
+                            <div class="password-container">
+                                <input id="signupPassword2" type="password" placeholder="تکرار رمز عبور" autocomplete="new-password">
+                                <button type="button" class="toggle-password" id="toggleSignupPassword2">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <label class="checkbox">
@@ -3352,16 +3427,21 @@
                             <label>شماره تلفن شما</label>
                             <p id="displayPhoneNumber" class="muted"></p>
                             <div class="otp-container">
-                                <input type="text" class="otp-input" maxlength="1" data-index="0" autocomplete="off" dir="ltr">
-                                <input type="text" class="otp-input" maxlength="1" data-index="1" autocomplete="off" dir="ltr">
-                                <input type="text" class="otp-input" maxlength="1" data-index="2" autocomplete="off" dir="ltr">
-                                <input type="text" class="otp-input" maxlength="1" data-index="3" autocomplete="off" dir="ltr">
-                                <input type="text" class="otp-input" maxlength="1" data-index="4" autocomplete="off" dir="ltr">
+                                <input type="text" class="otp-input" maxlength="1" data-index="0" autocomplete="one-time-code" dir="ltr">
+                                <input type="text" class="otp-input" maxlength="1" data-index="1" autocomplete="one-time-code" dir="ltr">
+                                <input type="text" class="otp-input" maxlength="1" data-index="2" autocomplete="one-time-code" dir="ltr">
+                                <input type="text" class="otp-input" maxlength="1" data-index="3" autocomplete="one-time-code" dir="ltr">
+                                <input type="text" class="otp-input" maxlength="1" data-index="4" autocomplete="one-time-code" dir="ltr">
                             </div>
                             <div class="timer" id="otpTimer">02:00</div>
                             <div class="resend-otp">
                                 <button type="button" id="resendOtpBtn" disabled>ارسال مجدد کد</button>
                             </div>
+                            <!-- دکمه WebOTP -->
+                            <button class="web-otp-btn" id="webOtpBtn" type="button">
+                                <i class="fas fa-mobile-alt"></i>
+                                دریافت خودکار کد از پیامک
+                            </button>
                             <button type="button" class="btn primary" id="verifyOtpBtn">تأیید و تکمیل ثبت‌نام</button>
                         </div>
                     </div>
@@ -3386,7 +3466,7 @@
                 <p>فیلتر کن؛ روی نقشه ببین یا لیست کن. با کلیک روی مارکر، جزئیاتش توی لیست هایلایت می‌شه.</p>
             </div>
 
-            <!-- فیلترها -->
+            <!-- فیلترهای بهبود یافته -->
             <div class="filters" role="region" aria-label="فیلتر رویدادها">
                 <!-- جستجوی پیشرفته -->
                 <div class="search-box">
@@ -3394,42 +3474,44 @@
                     <i class="fas fa-search search-icon"></i>
                 </div>
 
-                <label for="typeSelect" class="muted">نوع رویداد</label>
-                <select id="typeSelect">
-                    <option value="all">تمام دسته‌ها</option>
-                    <option value="national">🇮🇷 ملی</option>
-                    <option value="religious">🕌 مذهبی</option>
-                    <option value="personal">👨‍👩‍👧‍👦 شخصی</option>
-                    <option value="cultural">🎭 فرهنگی و اجتماعی</option>
-                </select>
+                <div class="filter-grid">
+                    <div class="filter-item">
+                        <label for="typeSelect">نوع رویداد</label>
+                        <select id="typeSelect">
+                            <option value="all">تمام دسته‌ها</option>
+                            <option value="national">🇮🇷 ملی</option>
+                            <option value="religious">🕌 مذهبی</option>
+                            <option value="personal">👨‍👩‍👧‍👦 شخصی</option>
+                            <option value="cultural">🎭 فرهنگی و اجتماعی</option>
+                        </select>
+                    </div>
 
-                <label for="categorySelect" class="muted">دسته‌بندی اصلی</label>
-                <select id="categorySelect">
-                    <option value="all">همه دسته‌بندی‌ها</option>
-                </select>
+                    <div class="filter-item">
+                        <label for="categorySelect">دسته‌بندی اصلی</label>
+                        <select id="categorySelect">
+                            <option value="all">همه دسته‌بندی‌ها</option>
+                        </select>
+                    </div>
 
-                <label for="countrySelect" class="muted">کشور</label>
-                <select id="countrySelect">
-                    <option value="all">همه کشورها</option>
-                    <option value="iran">ایران</option>
-                    <option value="turkey">ترکیه</option>
-                    <option value="saudi-arabia">عربستان سعودی</option>
-                    <option value="iraq">عراق</option>
-                    <option value="uae">امارات متحده عربی</option>
-                    <option value="qatar">قطر</option>
-                    <option value="kuwait">کویت</option>
-                    <option value="oman">عمان</option>
-                    <option value="lebanon">لبنان</option>
-                    <option value="jordan">اردن</option>
-                    <option value="egypt">مصر</option>
-                    <option value="syria">سوریه</option>
-                </select>
+                    <div class="filter-item">
+                        <label for="countrySelect">کشور</label>
+                        <select id="countrySelect">
+                            <option value="all">همه کشورها</option>
+                            <option value="iran">ایران</option>
+                            <option value="iraq">عراق</option>
+                        </select>
+                    </div>
 
-                <label for="provinceSelect" class="muted">استان</label>
-                <select id="provinceSelect"><option value="all">همه استان‌ها</option></select>
+                    <div class="filter-item">
+                        <label for="provinceSelect">استان</label>
+                        <select id="provinceSelect"><option value="all">همه استان‌ها</option></select>
+                    </div>
 
-                <label for="citySelect" class="muted">شهر</label>
-                <select id="citySelect"><option value="all">همه شهرها</option></select>
+                    <div class="filter-item">
+                        <label for="citySelect">شهر</label>
+                        <select id="citySelect"><option value="all">همه شهرها</option></select>
+                    </div>
+                </div>
 
                 <div class="controls-row">
                     <button class="btn primary" id="addEventBtn">ثبت رویداد جدید</button>
@@ -3510,6 +3592,7 @@
             </div>
         </div>
     </div>
+
 <!-- صفحه ثبت رویداد جدید -->
 <div id="addEventPage" class="page-section">
     <div class="wrap">
@@ -3598,7 +3681,7 @@
                             <label for="eventCountry">کشور</label>
                             <select id="eventCountry">
                                 <option value="iran" selected>ایران</option>
-                                <option value="other">سایر کشورها</option>
+                                <option value="iraq">عراق</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -3731,7 +3814,11 @@
 
 <script>
         // کانفیگ اولیه
-        const API_BASE_URL = "https://manareh.onrender.com";
+        const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? "http://localhost:8000" 
+            : "https://manareh.com";
+        
+        console.log(`API Base URL: ${API_BASE_URL}`);
         
         let token = localStorage.getItem('token') || null;
         let currentUserId = localStorage.getItem('userId') || null;
@@ -3817,6 +3904,28 @@
                     "پنل گفتگو",
                     "جلسه نقد و بررسی"
                 ]
+            }
+        };
+
+        // داده‌های کشورها (فقط ایران و عراق)
+        const countriesData = {
+            iran: {
+                name: "ایران",
+                provinces: {
+                    "تهران": ["تهران", "شهریار", "اسلامشهر", "رباط کریم", "قدس", "ملارد", "ورامین", "پاکدشت", "ری", "دماوند"],
+                    "خراسان رضوی": ["مشهد", "نیشابور", "سبزوار", "تربت حیدریه", "قوچان", "کاشمر", "تایباد", "خواف", "درگز", "چناران"],
+                    "اصفهان": ["اصفهان", "کاشان", "خمینی شهر", "شاهین شهر", "نجف آباد", "مبارکه", "فلاورجان", "شهرضا", "سمیرم", "آران و بیدگل"],
+                    "فارس": ["شیراز", "مرودشت", "کازرون", "سروستان", "فسا", "جهرم", "لار", "داراب", "اقلید", "لامرد"],
+                    "خوزستان": ["اهواز", "آبادان", "خرمشهر", "دزفول", "شوشتر", "گتوند", "اندیمشک", "مسجدسلیمان", "هندیجان", "بندر ماهشهر"]
+                }
+            },
+            iraq: {
+                name: "عراق",
+                provinces: {
+                    "بغداد": ["بغداد", "کاظمین", "کرخ"],
+                    "نجف": ["نجف", "کوفه"],
+                    "کربلا": ["کربلا"]
+                }
             }
         };
 
@@ -4080,10 +4189,11 @@
             }
         };
 
-        // مدیریت نقشه‌ها
+        // مدیریت نقشه‌ها - بهبود یافته
         const MapManager = {
             maps: {},
             markers: {},
+            addEventMarker: null,
             
             initializeSimpleMap() {
                 const mapElement = document.getElementById('simple-map');
@@ -4224,6 +4334,7 @@
                 try {
                     if (this.maps.addEvent) {
                         this.maps.addEvent.remove();
+                        this.addEventMarker = null;
                     }
                     
                     const map = L.map('add-event-map').setView([35.6892, 51.3890], 13);
@@ -4233,29 +4344,68 @@
                         maxZoom: 18
                     }).addTo(map);
                     
-                    let marker = null;
+                    // اضافه کردن کنترل‌های نقشه
+                    L.control.zoom({
+                        position: 'topright'
+                    }).addTo(map);
                     
-                    map.on('click', function(e) {
+                    // اضافه کردن کنترل مقیاس
+                    L.control.scale({
+                        imperial: false,
+                        metric: true,
+                        position: 'bottomright'
+                    }).addTo(map);
+                    
+                    // نمایش موقعیت کاربر
+                    if (navigator.geolocation) {
+                        L.control.locate({
+                            position: 'topright',
+                            drawCircle: true,
+                            follow: true,
+                            setView: true,
+                            keepCurrentZoomLevel: true,
+                            markerStyle: {
+                                weight: 1,
+                                opacity: 0.8,
+                                fillOpacity: 0.8
+                            },
+                            circleStyle: {
+                                weight: 1,
+                                stroke: true,
+                                color: '#136AEC',
+                                fillColor: '#136AEC',
+                                fillOpacity: 0.15
+                            }
+                        }).addTo(map);
+                    }
+                    
+                    // مدیریت کلیک روی نقشه
+                    map.on('click', (e) => {
                         const lat = e.latlng.lat;
                         const lng = e.latlng.lng;
                         
-                        if (marker) {
-                            map.removeLayer(marker);
+                        if (this.addEventMarker) {
+                            map.removeLayer(this.addEventMarker);
                         }
                         
-                        marker = L.marker([lat, lng]).addTo(map);
-                        marker.bindPopup("موقعیت انتخاب شده").openPopup();
+                        this.addEventMarker = L.marker([lat, lng]).addTo(map);
+                        this.addEventMarker.bindPopup("موقعیت انتخاب شده").openPopup();
                         
                         document.getElementById('eventCoordinates').textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                        
+                        // دریافت آدرس با API بهبود یافته
                         this.geocodeAddress(lat, lng);
-                    }.bind(this));
+                    });
                     
                     this.maps.addEvent = map;
                     
                     // مخفی کردن loading
                     setTimeout(() => {
-                        document.getElementById('mapLoading').style.display = 'none';
-                    }, 1000);
+                        const loadingElement = document.getElementById('mapLoading');
+                        if (loadingElement) {
+                            loadingElement.style.display = 'none';
+                        }
+                    }, 500);
                     
                 } catch (error) {
                     console.error("خطا در راه‌اندازی نقشه اضافه کردن رویداد:", error);
@@ -4268,21 +4418,26 @@
                     const response = await fetch(`${API_BASE_URL}/geocode?lat=${lat}&lng=${lng}`);
                     if (response.ok) {
                         const data = await response.json();
-                        const address = data.address || `تهران، مختصات: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-                        document.getElementById('eventAddress').value = address;
+                        let address = '';
                         
-                        // استفاده از Nominatim برای گرفتن آدرس دقیق‌تر
-                        try {
-                            const osmResponse = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=fa`);
-                            if (osmResponse.ok) {
-                                const osmData = await osmResponse.json();
-                                if (osmData.display_name) {
-                                    document.getElementById('eventAddress').value = osmData.display_name;
-                                }
-                            }
-                        } catch (osmError) {
-                            console.log('استفاده از آدرس اولیه');
+                        if (data.address && data.address !== 'آدرس نامشخص') {
+                            address = data.address;
+                        } else if (data.raw && Object.keys(data.raw).length > 0) {
+                            // ساخت آدرس از داده‌های خام
+                            const addressParts = [];
+                            if (data.raw.road) addressParts.push(data.raw.road);
+                            if (data.raw.neighbourhood) addressParts.push(data.raw.neighbourhood);
+                            if (data.raw.suburb) addressParts.push(data.raw.suburb);
+                            if (data.raw.city) addressParts.push(data.raw.city);
+                            if (data.raw.state) addressParts.push(data.raw.state);
+                            if (data.raw.country) addressParts.push(data.raw.country);
+                            
+                            address = addressParts.join('، ') || `تهران، مختصات: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                        } else {
+                            address = `تهران، مختصات: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
                         }
+                        
+                        document.getElementById('eventAddress').value = address;
                     } else {
                         document.getElementById('eventAddress').value = `تهران، مختصات: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
                     }
@@ -4336,7 +4491,7 @@
             }
         };
 
-        // مدیریت OTP - بهبود یافته با قابلیت ورود خودکار
+        // مدیریت OTP - بهبود یافته با WebOTP
         const OTPManager = {
             timer: null,
             timeLeft: 120,
@@ -4350,6 +4505,7 @@
                 const signupSubmitBtn = document.getElementById('signupSubmitBtn');
                 const verifyOtpBtn = document.getElementById('verifyOtpBtn');
                 const resendOtpBtn = document.getElementById('resendOtpBtn');
+                const webOtpBtn = document.getElementById('webOtpBtn');
                 const otpInputs = document.querySelectorAll('.otp-input');
                 
                 if (signupSubmitBtn) {
@@ -4364,12 +4520,15 @@
                     resendOtpBtn.addEventListener('click', this.resendOTP.bind(this));
                 }
                 
+                if (webOtpBtn) {
+                    webOtpBtn.addEventListener('click', this.requestWebOTP.bind(this));
+                }
+                
                 // بهبود ورود خودکار OTP
                 otpInputs.forEach((input, index) => {
                     input.dir = 'ltr';
                     input.style.textAlign = 'center';
                     
-                    // پشتیبانی از ورود خودکار در موبایل
                     input.addEventListener('input', (e) => {
                         const value = e.target.value;
                         
@@ -4389,23 +4548,6 @@
                         this.checkOTPComplete();
                     });
                     
-                    input.addEventListener('paste', (e) => {
-                        e.preventDefault();
-                        const pastedData = e.clipboardData.getData('text').trim();
-                        if (/^\d{5}$/.test(pastedData)) {
-                            const digits = pastedData.split('');
-                            otpInputs.forEach((input, i) => {
-                                if (i < 5) {
-                                    input.value = digits[i] || '';
-                                }
-                            });
-                            this.checkOTPComplete();
-                            if (digits.length === 5) {
-                                this.verifyOTP();
-                            }
-                        }
-                    });
-                    
                     input.addEventListener('keydown', (e) => {
                         if (e.key === 'Backspace' && !e.target.value && index > 0) {
                             setTimeout(() => {
@@ -4417,35 +4559,7 @@
                     });
                 });
                 
-                // اضافه کردن قابلیت خواندن پیامک در مرورگر (فقط برای تست)
-                if ('OTPCredential' in window) {
-                    this.setupSMSReceiver();
-                }
-                
                 console.log("مدیریت OTP راه‌اندازی شد");
-            },
-            
-            setupSMSReceiver() {
-                // این بخش برای مرورگرهایی که از WebOTP API پشتیبانی می‌کنند
-                if ('OTPCredential' in window) {
-                    navigator.credentials.get({
-                        otp: { transport: ['sms'] }
-                    }).then(otp => {
-                        if (otp && otp.code) {
-                            const digits = otp.code.split('');
-                            const otpInputs = document.querySelectorAll('.otp-input');
-                            otpInputs.forEach((input, i) => {
-                                if (i < 5 && digits[i]) {
-                                    input.value = digits[i];
-                                }
-                            });
-                            this.checkOTPComplete();
-                            setTimeout(() => this.verifyOTP(), 500);
-                        }
-                    }).catch(err => {
-                        console.log('WebOTP API error:', err);
-                    });
-                }
             },
             
             async handleSignup() {
@@ -4549,10 +4663,12 @@
                         
                         this.startTimer();
                         
-                        showModal('ارسال کد', 'کد تأیید به شماره شما ارسال شد.', 'success');
+                        // فعال کردن دکمه WebOTP اگر مرورگر پشتیبانی می‌کند
+                        if ('OTPCredential' in window) {
+                            document.getElementById('webOtpBtn').disabled = false;
+                        }
                         
-                        // فعال کردن WebOTP API برای موبایل
-                        this.setupSMSReceiver();
+                        showModal('ارسال کد', 'کد تأیید به شماره شما ارسال شد.', 'success');
                         
                     } else {
                         const error = await response.json();
@@ -4634,6 +4750,40 @@
                 }
             },
             
+            // درخواست WebOTP API
+            async requestWebOTP() {
+                if (!('OTPCredential' in window)) {
+                    showModal('خطا', 'مرورگر شما از قابلیت دریافت خودکار کد پشتیبانی نمی‌کند.', 'error');
+                    return;
+                }
+                
+                try {
+                    const otp = await navigator.credentials.get({
+                        otp: { transport: ['sms'] }
+                    });
+                    
+                    if (otp && otp.code) {
+                        // وارد کردن خودکار کد در فیلدهای OTP
+                        const code = otp.code;
+                        const otpInputs = document.querySelectorAll('.otp-input');
+                        
+                        if (code.length === 5) {
+                            for (let i = 0; i < 5; i++) {
+                                otpInputs[i].value = code[i];
+                            }
+                            
+                            // تأیید خودکار کد
+                            setTimeout(() => {
+                                this.verifyOTP();
+                            }, 500);
+                        }
+                    }
+                } catch (error) {
+                    console.error("خطا در دریافت WebOTP:", error);
+                    // در صورت خطا، کاربر می‌تواند کد را دستی وارد کند
+                }
+            },
+            
             checkOTPComplete() {
                 const otpInputs = document.querySelectorAll('.otp-input');
                 const complete = Array.from(otpInputs).every(input => input.value.length === 1);
@@ -4676,7 +4826,7 @@
             }
         };
 
-        // مدیریت نذورات - حذف بخش مبلغ
+        // مدیریت نذورات - بهبود یافته
         const DonationManager = {
             selectedType: null,
             
@@ -4725,7 +4875,7 @@
                 const cardNumber = "6219861918435032";
                 
                 showModal('پرداخت نذری', 
-                    `برای پرداخت نذری ${this.getDonationTypeName(this.selectedType)}، لطفاً مبلغ مورد نظر خود را به شماره کارت زیر واریز کنید:\n\n${cardNumber}\n\nپس از واریز، رسید پرداخت را برای ما ارسال کنید.`, 
+                    `برای پرداخت نذری، لطفاً مبلغ را به شماره کارت زیر واریز کنید:\n\n${cardNumber}\n\nپس از واریز، رسید پرداخت را برای ما ارسال کنید.`, 
                     'success'
                 );
                 
@@ -4735,7 +4885,6 @@
                         headers: getAuthHeaders(),
                         body: JSON.stringify({
                             donation_type: this.getDonationTypeName(this.selectedType),
-                            amount: 0, // مقدار ثابت
                             payment_method: 'card'
                         })
                     });
@@ -4885,7 +5034,7 @@
                 
                 // پر کردن کشورها
                 countrySelect.innerHTML = '<option value="all">همه کشورها</option>';
-                const countries = ['iran', 'turkey', 'saudi-arabia', 'iraq', 'uae', 'qatar', 'kuwait', 'oman', 'lebanon', 'jordan', 'egypt', 'syria'];
+                const countries = ['iran', 'iraq'];
                 countries.forEach(country => {
                     const option = document.createElement('option');
                     option.value = country;
@@ -4937,7 +5086,6 @@
                     this.applyFilters();
                 });
 
-                // اضافه کردن event listener برای دکمه رفرش
                 if (refreshBtn) {
                     refreshBtn.addEventListener('click', () => {
                         this.refreshEvents();
@@ -4972,17 +5120,7 @@
             getCountryName(countryCode) {
                 const countries = {
                     'iran': 'ایران',
-                    'turkey': 'ترکیه',
-                    'saudi-arabia': 'عربستان سعودی',
-                    'iraq': 'عراق',
-                    'uae': 'امارات',
-                    'qatar': 'قطر',
-                    'kuwait': 'کویت',
-                    'oman': 'عمان',
-                    'lebanon': 'لبنان',
-                    'jordan': 'اردن',
-                    'egypt': 'مصر',
-                    'syria': 'سوریه'
+                    'iraq': 'عراق'
                 };
                 return countries[countryCode] || countryCode;
             },
@@ -5490,134 +5628,99 @@
             }
         }
 
-        // داده‌های کشورها
-        window.countriesData = {
-            'iran': {
-                name: 'ایران',
-                provinces: {
-                    'تهران': ['تهران', 'شهریار', 'اسلامشهر', 'رباط کریم', 'قدس', 'ملارد'],
-                    'خراسان رضوی': ['مشهد', 'نیشابور', 'سبزوار', 'تربت حیدریه', 'قوچان'],
-                    'اصفهان': ['اصفهان', 'کاشان', 'خمینی شهر', 'شاهین شهر', 'نجف آباد'],
-                    'فارس': ['شیراز', 'مرودشت', 'کازرون', 'سروستان', 'فسا'],
-                    'خوزستان': ['اهواز', 'آبادان', 'خرمشهر', 'دزفول', 'شوشتر', 'گتوند'],
-                    'آذربایجان شرقی': ['تبریز', 'مراغه', 'مرند', 'اهر', 'اسکو'],
-                    'مازندران': ['ساری', 'بابل', 'آمل', 'قائم شهر', 'نور'],
-                    'گیلان': ['رشت', 'انزلی', 'لاهیجان', 'آستارا', 'تالش'],
-                    'کرمان': ['کرمان', 'رفسنجان', 'سیرجان', 'بم', 'جیرفت'],
-                    'البرز': ['کرج', 'نظرآباد', 'اشتهارد', 'طالقان']
-                }
-            },
-            'turkey': {
-                name: 'ترکیه',
-                provinces: {
-                    'استانبول': ['استانبول'],
-                    'آنکارا': ['آنکارا'],
-                    'ازمیر': ['ازمیر'],
-                    'بورسا': ['بورسا'],
-                    'آنتالیا': ['آنتالیا']
-                }
-            },
-            'saudi-arabia': {
-                name: 'عربستان سعودی',
-                provinces: {
-                    'ریاض': ['ریاض'],
-                    'جده': ['جده'],
-                    'مکه': ['مکه'],
-                    'مدینه': ['مدینه'],
-                    'دمام': ['دمام']
-                }
-            },
-            'iraq': {
-                name: 'عراق',
-                provinces: {
-                    'بغداد': ['بغداد'],
-                    'بصره': ['بصره'],
-                    'موصل': ['موصل'],
-                    'کربلا': ['کربلا'],
-                    'نجف': ['نجف']
-                }
-            },
-            'uae': {
-                name: 'امارات',
-                provinces: {
-                    'دبی': ['دبی'],
-                    'ابوظبی': ['ابوظبی'],
-                    'شارجه': ['شارجه'],
-                    'عجمان': ['عجمان'],
-                    'راس الخیمه': ['راس الخیمه']
-                }
-            },
-            'qatar': {
-                name: 'قطر',
-                provinces: {
-                    'دوحه': ['دوحه'],
-                    'الریان': ['الریان'],
-                    'ام صلال': ['ام صلال'],
-                    'الخور': ['الخور'],
-                    'الوعی': ['الوعی']
-                }
-            },
-            'kuwait': {
-                name: 'کویت',
-                provinces: {
-                    'کویت': ['کویت'],
-                    'حولی': ['حولی'],
-                    'فرمانیه': ['فرمانیه'],
-                    'احمدی': ['احمدی'],
-                    'جهرا': ['جهرا']
-                }
-            },
-            'oman': {
-                name: 'عمان',
-                provinces: {
-                    'مسقط': ['مسقط'],
-                    'صلاله': ['صلاله'],
-                    'صحار': ['صحار'],
-                    'صور': ['صور'],
-                    'نزوی': ['نزوی']
-                }
-            },
-            'lebanon': {
-                name: 'لبنان',
-                provinces: {
-                    'بیروت': ['بیروت'],
-                    'طرابلس': ['طرابلس'],
-                    'صور': ['صور'],
-                    'صیدا': ['صیدا'],
-                    'زحله': ['زحله']
-                }
-            },
-            'jordan': {
-                name: 'اردن',
-                provinces: {
-                    'عمان': ['عمان'],
-                    'زرقاء': ['زرقاء'],
-                    'اربد': ['اربد'],
-                    'مادبا': ['مادبا'],
-                    'عقبه': ['عقبه']
-                }
-            },
-            'egypt': {
-                name: 'مصر',
-                provinces: {
-                    'قاهره': ['قاهره'],
-                    'اسکندریه': ['اسکندریه'],
-                    'جیزه': ['جیزه'],
-                    'شرم الشیخ': ['شرم الشیخ'],
-                    'پورت سعید': ['پورت سعید']
-                }
-            },
-            'syria': {
-                name: 'سوریه',
-                provinces: {
-                    'دمشق': ['دمشق'],
-                    'حلب': ['حلب'],
-                    'حمص': ['حمص'],
-                    'لاذقیه': ['لاذقیه'],
-                    'حماة': ['حماة']
-                }
+        // تابع مدیریت نمایش/مخفی کردن رمز
+        function initPasswordToggles() {
+            const toggleLoginPassword = document.getElementById('toggleLoginPassword');
+            const toggleSignupPassword = document.getElementById('toggleSignupPassword');
+            const toggleSignupPassword2 = document.getElementById('toggleSignupPassword2');
+            
+            if (toggleLoginPassword) {
+                toggleLoginPassword.addEventListener('click', function() {
+                    const passwordInput = document.getElementById('loginPassword');
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+                    this.querySelector('i').className = type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
+                });
             }
-        };
+            
+            if (toggleSignupPassword) {
+                toggleSignupPassword.addEventListener('click', function() {
+                    const passwordInput = document.getElementById('signupPassword');
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+                    this.querySelector('i').className = type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
+                });
+            }
+            
+            if (toggleSignupPassword2) {
+                toggleSignupPassword2.addEventListener('click', function() {
+                    const passwordInput = document.getElementById('signupPassword2');
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+                    this.querySelector('i').className = type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
+                });
+            }
+        }
+
+        // تابع مدیریت داده‌های کشورها
+        function initCountryData() {
+            const countrySelect = document.getElementById('signupCountry');
+            const provinceSelect = document.getElementById('signupProvince');
+            const citySelect = document.getElementById('signupCity');
+            
+            if (countrySelect) {
+                countrySelect.innerHTML = '<option value="" disabled selected>انتخاب کشور</option>';
+                Object.keys(countriesData).forEach(countryCode => {
+                    const option = document.createElement('option');
+                    option.value = countryCode;
+                    option.textContent = countriesData[countryCode].name;
+                    countrySelect.appendChild(option);
+                });
+                
+                countrySelect.addEventListener('change', function() {
+                    const selectedCountry = this.value;
+                    provinceSelect.innerHTML = '<option value="" disabled selected>انتخاب استان</option>';
+                    citySelect.innerHTML = '<option value="" disabled selected>ابتدا استان را انتخاب کنید</option>';
+                    
+                    if (selectedCountry && countriesData[selectedCountry]) {
+                        Object.keys(countriesData[selectedCountry].provinces).forEach(province => {
+                            const option = document.createElement('option');
+                            option.value = province;
+                            option.textContent = province;
+                            provinceSelect.appendChild(option);
+                        });
+                    }
+                    
+                    // تنظیم پیش‌شماره تلفن بر اساس کشور
+                    const phonePrefixSelect = document.getElementById('signupPhonePrefix');
+                    if (selectedCountry === 'iran') {
+                        phonePrefixSelect.value = '+98';
+                    } else if (selectedCountry === 'iraq') {
+                        phonePrefixSelect.value = '+964';
+                    }
+                });
+            }
+            
+            if (provinceSelect) {
+                provinceSelect.addEventListener('change', function() {
+                    const selectedCountry = document.getElementById('signupCountry').value;
+                    const selectedProvince = this.value;
+                    citySelect.innerHTML = '<option value="" disabled selected>انتخاب شهر</option>';
+                    
+                    if (selectedCountry && selectedProvince && 
+                        countriesData[selectedCountry] && 
+                        countriesData[selectedCountry].provinces[selectedProvince]) {
+                        
+                        countriesData[selectedCountry].provinces[selectedProvince].forEach(city => {
+                            const option = document.createElement('option');
+                            option.value = city;
+                            option.textContent = city;
+                            citySelect.appendChild(option);
+                        });
+                    }
+                });
+            }
+        }
 
         // تابع‌های مدیریت فرم ثبت رویداد
         function initEventForm() {
@@ -5766,6 +5869,8 @@
             // راه‌اندازی اولیه
             OTPManager.initialize();
             DonationManager.initialize();
+            initPasswordToggles();
+            initCountryData();
             
             // event listener برای دکمه برگشت
             document.getElementById('backButton').addEventListener('click', function() {
@@ -5818,8 +5923,8 @@
             document.querySelectorAll('.calendar-btn').forEach(btn => {
                 btn.addEventListener('click', function(e) {
                     e.preventDefault();
-                    // هدایت به صفحه تقویم مناره
-                    window.open(`${API_BASE_URL}/calendar`, '_blank');
+                    // باز کردن تقویم در تب جدید
+                    window.open('/calendar', '_blank');
                 });
             });
             
@@ -5843,67 +5948,6 @@
             if (submitEventBtn) {
                 submitEventBtn.addEventListener('click', submitNewEvent);
             }
-            
-            // event listener برای کشور در فرم ثبت‌نام
-            document.getElementById('signupCountry').addEventListener('change', function() {
-                const selectedCountry = this.value;
-                const provinceSelect = document.getElementById('signupProvince');
-                const citySelect = document.getElementById('signupCity');
-                
-                provinceSelect.innerHTML = '<option value="" disabled selected>انتخاب استان</option>';
-                citySelect.innerHTML = '<option value="" disabled selected>ابتدا استان را انتخاب کنید</option>';
-                
-                if (selectedCountry && window.countriesData[selectedCountry]) {
-                    Object.keys(window.countriesData[selectedCountry].provinces).forEach(province => {
-                        const option = document.createElement('option');
-                        option.value = province;
-                        option.textContent = province;
-                        provinceSelect.appendChild(option);
-                    });
-                }
-            });
-         
-            document.getElementById('signupProvince').addEventListener('change', function() {
-                const selectedCountry = document.getElementById('signupCountry').value;
-                const selectedProvince = this.value;
-                const citySelect = document.getElementById('signupCity');
-                
-                citySelect.innerHTML = '<option value="" disabled selected>انتخاب شهر</option>';
-                
-                if (selectedCountry && selectedProvince && window.countriesData[selectedCountry] && window.countriesData[selectedCountry].provinces[selectedProvince]) {
-                    window.countriesData[selectedCountry].provinces[selectedProvince].forEach(city => {
-                        const option = document.createElement('option');
-                        option.value = city;
-                        option.textContent = city;
-                        citySelect.appendChild(option);
-                    });
-                }
-            });
-            
-            // تنظیم پیش‌شماره تلفن بر اساس کشور انتخاب شده
-            document.getElementById('signupCountry').addEventListener('change', function() {
-                const country = this.value;
-                const phonePrefixSelect = document.getElementById('signupPhonePrefix');
-                
-                const prefixMap = {
-                    'iran': '+98',
-                    'turkey': '+90',
-                    'saudi-arabia': '+966',
-                    'iraq': '+964',
-                    'uae': '+971',
-                    'qatar': '+974',
-                    'kuwait': '+965',
-                    'oman': '+968',
-                    'lebanon': '+961',
-                    'jordan': '+962',
-                    'egypt': '+20',
-                    'syria': '+963'
-                };
-                
-                if (prefixMap[country]) {
-                    phonePrefixSelect.value = prefixMap[country];
-                }
-            });
             
             // event listener برای دکمه‌های CTA
             document.getElementById('startButton').addEventListener('click', function() {
@@ -5940,7 +5984,6 @@
                 });
             });
             
-
             // event listener برای دکمه‌های پروفایل
             document.querySelectorAll('.profile-option').forEach(option => {
                 option.addEventListener('click', function(e) {
